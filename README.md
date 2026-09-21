@@ -6,6 +6,8 @@ Spotify URIs, or brand-new playlists on your account.
 
 ![The curve editor](docs/editor.png)
 
+Paste any Spotify playlist or album link into the box at the top and it loads.
+
 Two ways to use it:
 
 - **Web editor** (`server.py` + `index.html`). One panel per feature, each with a
@@ -20,8 +22,13 @@ Two ways to use it:
    no client secret).
 2. Looks up audio features (valence, tempo, energy, danceability, acousticness,
    instrumentalness, loudness, speechiness) from [ReccoBeats](https://reccobeats.com),
-   because Spotify's own audio-features endpoint returns 403 for apps created after
-   November 2024. Tracks it can't match by ID are retried by title search.
+   a mirror of Spotify's original feature data, because Spotify's own audio-features
+   endpoint is deprecated and returns 403 for every app without approved extended quota.
+   Tracks it can't match by ID are retried by title search.
+   For anything still missing, **Estimate missing from audio** downloads the track's
+   30-second preview, extracts descriptors with librosa, and predicts each feature with a
+   model fitted on the tracks that do have values (`estimate_features.py`). Estimates are
+   marked ≈ in the UI. They're rough: valence cross-validates at about ±0.15.
 3. Splits the playlist into N playlists of H hours. Each playlist gets a set of time
    slots, and every slot has a target value per enabled feature read off your curve.
 4. Solves the slot-to-track assignment exactly (Hungarian algorithm in the browser,
@@ -38,7 +45,8 @@ You need Python 3.10+ and a free Spotify developer app.
    to exactly `http://127.0.0.1:8888/callback`, tick Web API, and copy the Client ID.
 2. Copy `config.example.json` to `config.json` and fill in the Client ID and your
    playlist URL or ID.
-3. Optional, for the CLI chart only: `pip install -r requirements.txt`.
+3. Optional: `pip install -r requirements.txt` for the CLI chart (matplotlib) and the
+   audio estimator (librosa, scikit-learn, soundfile). The editor itself needs nothing.
 
 ## Web editor
 
@@ -77,7 +85,8 @@ from cache with no network.
 | `index.html` | the editor, vanilla JS and SVG, no build step |
 | `server.py` | serves the page, the cached data, and the create endpoint |
 | `spotify_sine.py` | Spotify auth, fetch, ReccoBeats lookup, CLI planner, chart |
+| `estimate_features.py` | predicts features from preview audio for tracks with none |
 | `config.example.json` | template for `config.json` |
 
-`config.json`, `token.json`, and the cached `playlist_tracks.json` / `features.json` are
-git-ignored.
+`config.json`, `token.json`, the `cache/` and `previews/` folders, and `features.json`
+are git-ignored.

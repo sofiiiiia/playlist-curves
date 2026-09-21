@@ -1,2 +1,6 @@
-# Only needed for the CLI's chart; the web editor and everything else use the standard library.
+# CLI chart
 matplotlib
+# "Estimate missing from audio" (optional; the editor works without these)
+librosa
+scikit-learn
+soundfile

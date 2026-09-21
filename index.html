@@ -27,6 +27,8 @@
   label { color: var(--ink2); font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
   input[type=number], select, button { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; }
   input[type=number] { width: 64px; }
+  input[type=url] { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; width: min(480px, 60vw); }
+  .sub a { color: var(--ink2); }
   button { cursor: pointer; } button:hover { border-color: var(--muted); } button.primary { border-color: var(--ink); }
   button:disabled { opacity: .5; cursor: default; }
   .tabs button { border-radius: 999px; padding: 3px 12px; } .tabs button[aria-selected=true] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
@@ -62,13 +64,16 @@
   table.list { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
   table.list th, table.list td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--grid); }
   table.list th { color: var(--muted); font-weight: 500; font-size: 12px; } table.list td.n { text-align: right; color: var(--ink2); }
+  .est { color: var(--muted); font-weight: 400; font-size: 11px; }
   #msg { color: var(--ink2); font-size: 13px; } #msg a { color: var(--ink); }
 </style>
 </head>
 <body>
 <header>
   <h1 id="title">Playlist curve editor</h1>
-  <span class="sub" id="subtitle">loading…</span>
+  <input type="url" id="link" placeholder="Paste a Spotify playlist or album link" spellcheck="false">
+  <button id="btnLoad" class="primary">Load</button>
+  <span class="sub" id="subtitle"></span>
 </header>
 <div class="row">
   <label>Playlists <input type="number" id="nPl" min="1" max="4" value="2"></label>
@@ -79,6 +84,7 @@
   <button id="btnUris">Copy URIs</button>
   <button id="btnCreate" class="primary">Create on Spotify</button>
   <button id="btnRefetch" title="Re-pull the source playlist from Spotify">Refetch</button>
+  <button id="btnEstimate" title="Predict features from the 30-second previews for tracks that have none" hidden>Estimate missing from audio</button>
 </div>
 <div class="row"><span id="msg"></span></div>
 <div class="chips" id="chips"></div>
@@ -309,7 +315,7 @@ function drawPanel(svg, f) {
 function showTip(e, o) {
   const tip = $('#tip'); tip.hidden = false;
   const rows = FEATURES.filter(f => f.enabled).map(f => `<tr><td>${f.label}</td><td class="v">${fmt(f, o.features[f.key])}</td><td>target ${fmt(f, o.target[f.key])}</td></tr>`).join('');
-  tip.innerHTML = `<div class="t">${o.title}</div><div class="a">${o.artist} · starts ${hhmm(o.start)}</div><table>${rows}</table>`;
+  tip.innerHTML = `<div class="t">${o.title}${o.estimated ? ' <span class="est">≈ estimated from audio</span>' : ''}</div><div class="a">${o.artist} · starts ${hhmm(o.start)}</div><table>${rows}</table>`;
   const x = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 10);
   tip.style.left = x + 'px'; tip.style.top = (e.clientY + 14) + 'px';
 }
@@ -333,12 +339,12 @@ function renderList() {
   const active = FEATURES.filter(f => f.enabled), o = plans[selected] || [];
   $('#listSummary').textContent = `Track order · playlist ${selected + 1} (${o.length} tracks)`;
   $('#list').innerHTML = `<table class="list"><tr><th>#</th><th>Start</th><th>Title</th><th>Artist</th>${active.map(f => `<th>${f.label}</th>`).join('')}</tr>` +
-    o.map((t, i) => `<tr><td class="n">${i + 1}</td><td class="n">${hhmm(t.start)}</td><td>${t.title}</td><td>${t.artist}</td>${active.map(f => `<td class="n">${fmt(f, t.features[f.key])}</td>`).join('')}</tr>`).join('') + '</table>';
+    o.map((t, i) => `<tr><td class="n">${i + 1}</td><td class="n">${hhmm(t.start)}</td><td>${t.title}${t.estimated ? ' <span class="est" title="features estimated from the audio preview">≈</span>' : ''}</td><td>${t.artist}</td>${active.map(f => `<td class="n">${t.estimated ? '≈' : ''}${fmt(f, t.features[f.key])}</td>`).join('')}</tr>`).join('') + '</table>';
   const used = new Set(plans.flat().map(t => t.id));
   const left = pool.filter(t => !used.has(t.id));
   $('#unplacedSummary').textContent = `Unplaced tracks · ${unplaced.length} without feature data, ${left.length} not needed for the chosen length`;
   $('#unplaced').innerHTML = `<table class="list"><tr><th>Title</th><th>Artist</th><th>Why</th></tr>` +
-    unplaced.map(t => `<tr><td>${t.title}</td><td>${t.artist}</td><td>no audio features available</td></tr>`).join('') +
+    unplaced.map(t => `<tr><td>${t.title}</td><td>${t.artist}</td><td>no audio features available — use "Estimate missing from audio"</td></tr>`).join('') +
     left.map(t => `<tr><td>${t.title}</td><td>${t.artist}</td><td>playlists are full</td></tr>`).join('') + '</table>';
 }
 
@@ -381,21 +387,45 @@ $('#btnCreate').onclick = async () => {
   $('#btnCreate').disabled = false;
 };
 $('#btnRefetch').onclick = () => load(true);
+$('#btnEstimate').onclick = async () => {
+  $('#btnEstimate').disabled = true; msg('Analyzing previews… this takes a few seconds per track.');
+  try {
+    const r = await fetch('/api/estimate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ link: data.url }) });
+    const j = await r.json(); if (j.error) throw new Error(j.error);
+    await load(false);
+    msg(`Estimated ${j.estimated} track${j.estimated === 1 ? '' : 's'} from audio${j.no_preview ? `, ${j.no_preview} had no preview` : ''}. Estimates are marked ≈ and are rough (valence typically within ±0.15).`);
+  } catch (e) { msg('Estimate failed: ' + e.message); }
+  $('#btnEstimate').disabled = false;
+};
+$('#btnLoad').onclick = () => load(false);
+$('#link').addEventListener('keydown', e => { if (e.key === 'Enter') load(false); });
 $('#nPl').onchange = e => { state.nPl = Math.max(1, Math.min(4, +e.target.value)); selected = 0; rebuild(); };
-$('#hours').onchange = e => { state.hours = Math.max(0.5, +e.target.value); rebuild(); };
+$('#hours').onchange = e => { state.hours = Math.max(0.5, +e.target.value); state.userSetHours = true; rebuild(); };
 function msg(html) { $('#msg').innerHTML = html; }
 
 // ---------- load ----------
 async function load(refetch = false) {
-  msg(refetch ? 'Refetching from Spotify…' : '');
-  data = await (await fetch('/api/data' + (refetch ? '?refetch=1' : ''))).json();
-  pool = data.tracks.filter(t => t.features); unplaced = data.tracks.filter(t => !t.features);
-  const total = data.tracks.reduce((s, t) => s + t.duration, 0) / 3.6e6;
-  $('#title').textContent = data.name;
-  $('#subtitle').textContent = `${data.tracks.length} tracks · ${total.toFixed(1)} h · ${pool.length} with audio features`;
-  FEATURES.forEach(f => applyPreset(f, f.preset || (f.key === 'valence' ? 'sine' : 'flat')));
-  renderChips(); rebuild(); if (refetch) msg('Refetched.');
+  const link = $('#link').value.trim();
+  msg(refetch ? 'Refetching from Spotify…' : 'Loading…'); $('#btnLoad').disabled = true;
+  try {
+    const r = await fetch(`/api/data?link=${encodeURIComponent(link)}${refetch ? '&refetch=1' : ''}`);
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    data = d; localStorage.setItem('lastLink', d.url); $('#link').value = d.url;
+    pool = data.tracks.filter(t => t.features); unplaced = data.tracks.filter(t => !t.features);
+    const total = data.tracks.reduce((s, t) => s + t.duration, 0) / 3.6e6;
+    $('#title').textContent = data.name;
+    $('#subtitle').innerHTML = `${data.tracks.length} tracks · ${total.toFixed(1)} h · ${pool.length} with audio features · <a href="${data.url}" target="_blank">open in Spotify</a>`;
+    document.title = data.name + ' · curve editor';
+    // default length: whole thing in one go, rounded to the half hour, unless the user set something
+    if (!state.userSetHours) { state.hours = Math.max(0.5, Math.round(total / state.nPl * 2) / 2); $('#hours').value = state.hours; }
+    FEATURES.forEach(f => applyPreset(f, f.preset && f.preset !== 'custom' ? f.preset : (f.key === 'valence' ? 'sine' : 'flat')));
+    $('#btnEstimate').hidden = unplaced.length === 0;
+    renderChips(); rebuild(); msg(refetch ? 'Refetched.' : '');
+  } catch (e) { msg('Could not load: ' + e.message); }
+  $('#btnLoad').disabled = false;
 }
+$('#link').value = localStorage.getItem('lastLink') || '';
 load();
 </script>
 </body>

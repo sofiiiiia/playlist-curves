@@ -104,6 +104,50 @@ def auth(client_id):
 
 
 # ---------- 2. fetch ----------
+import re as _re
+def parse_link(link):
+    """Accept open.spotify.com URLs, spotify: URIs, or a bare id. Returns (kind, id)."""
+    link = (link or "").strip()
+    m = _re.search(r"open\.spotify\.com/(?:intl-[a-z]+/)?(playlist|album)/([A-Za-z0-9]+)", link) \
+        or _re.search(r"spotify:(playlist|album):([A-Za-z0-9]+)", link)
+    if m: return m.group(1), m.group(2)
+    if _re.fullmatch(r"[A-Za-z0-9]{22}", link): return "playlist", link
+    raise ValueError("Not a Spotify playlist or album link: " + link[:80])
+
+
+def fetch_tracks(token, kind, item_id):
+    """Return {'name','kind','id','tracks':[...]} for a playlist or an album."""
+    H = {"Authorization": "Bearer " + token}
+    tracks = []
+    if kind == "playlist":
+        meta = http(f"https://api.spotify.com/v1/playlists/{item_id}?fields=name", headers=H)
+        url = (f"https://api.spotify.com/v1/playlists/{item_id}/items?limit=100"
+               "&fields=next,items(item(id,uri,name,duration_ms,artists(name)))")
+        while url:
+            page = http(url, headers=H)
+            for it in page["items"]:
+                t = it.get("item")
+                if t and t.get("id"):
+                    tracks.append({"id": t["id"], "uri": t["uri"], "title": t["name"],
+                                   "artist": ", ".join(a["name"] for a in t["artists"]), "duration": t["duration_ms"]})
+            url = page.get("next")
+    elif kind == "album":
+        meta = http(f"https://api.spotify.com/v1/albums/{item_id}", headers=H)
+        url = f"https://api.spotify.com/v1/albums/{item_id}/tracks?limit=50"
+        while url:
+            page = http(url, headers=H)
+            for t in page["items"]:
+                if t and t.get("id"):
+                    tracks.append({"id": t["id"], "uri": t["uri"], "title": t["name"],
+                                   "artist": ", ".join(a["name"] for a in t["artists"]), "duration": t["duration_ms"]})
+            url = page.get("next")
+    else:
+        raise ValueError("unsupported kind " + kind)
+    print(f"fetched {len(tracks)} tracks from {kind} '{meta['name']}' "
+          f"({sum(t['duration'] for t in tracks)/3.6e6:.2f} h)")
+    return {"name": meta["name"], "kind": kind, "id": item_id, "tracks": tracks}
+
+
 def fetch_playlist(token, playlist_id):
     H = {"Authorization": "Bearer " + token}
     meta = http(f"https://api.spotify.com/v1/playlists/{playlist_id}?fields=name", headers=H)
@@ -125,14 +169,32 @@ def fetch_playlist(token, playlist_id):
 
 # ---------- 3. features ----------
 def fetch_features(tracks):
+    """ReccoBeats audio features per Spotify track id, cached in features.json.
+    Ids ReccoBeats doesn't know are retried by title + artist search (different release
+    of the same song). Tracks still missing are stored as None."""
     feats = json.load(open(FEATS_F)) if os.path.exists(FEATS_F) else {}
+    by_id = {t["id"]: t for t in tracks}
     missing = [t["id"] for t in tracks if t["id"] not in feats]
     for i in range(0, len(missing), 40):
         batch = missing[i:i + 40]
         r = http("https://api.reccobeats.com/v1/audio-features?ids=" + ",".join(batch))
         found = {c["href"].rsplit("/", 1)[-1]: c for c in r.get("content", [])}
         for tid in batch:
-            feats[tid] = found.get(tid)  # None = not in ReccoBeats
+            feats[tid] = found.get(tid)
+        time.sleep(0.3)
+    for tid in missing:
+        if feats.get(tid): continue
+        t = by_id[tid]
+        title = t["title"].split(" - ")[0].split(" (")[0].strip()
+        artist0 = t["artist"].split(",")[0].strip().lower()
+        try:
+            r = http("https://api.reccobeats.com/v1/track/search?searchText=" + urllib.parse.quote(title) + "&size=10")
+            hits = [c for c in r.get("content", []) if any(artist0 in a["name"].lower() for a in c.get("artists", []))]
+            if hits:
+                af = http(f"https://api.reccobeats.com/v1/track/{hits[0]['id']}/audio-features")
+                feats[tid] = {**af, "href": hits[0].get("href"), "matched_via": "search"}
+        except Exception as e:
+            print("  search fallback failed for", t["title"], e)
         time.sleep(0.3)
     json.dump(feats, open(FEATS_F, "w"))
     n = sum(1 for t in tracks if feats.get(t["id"]))
