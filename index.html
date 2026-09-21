@@ -497,7 +497,12 @@ const api = {
       const d = await (await fetch(`/api/data?link=${encodeURIComponent(link)}${refetch ? '&refetch=1' : ''}`)).json();
       if (d.error) throw new Error(d.error); return d;
     }
-    const d = await fetchTracksDirect(link);
+    let d = null;
+    try {  // hosted copies may have a serverless reader that needs no user login
+      const r = await fetch(`/api/tracks?link=${encodeURIComponent(link)}`);
+      if (r.status !== 404 && r.status !== 503) { const j = await r.json(); if (j.error) throw new Error(j.error); d = j; }
+    } catch (e) { if (!(await getToken())) throw e; }
+    if (!d) d = await fetchTracksDirect(link);
     const feats = await fetchFeaturesDirect(d.tracks, refetch);
     d.tracks.forEach(t => { t.features = feats[t.id] || null; t.estimated = false; });
     return d;
@@ -532,6 +537,7 @@ $('#btnUris').onclick = async () => {
   msg(`Copied ${plans[selected].length} URIs for playlist ${selected + 1}. In the Spotify desktop app, open a playlist and paste.`);
 };
 $('#btnCreate').onclick = async () => {
+  if (MODE === 'static' && !(await getToken())) { msg('Log in with Spotify (top right) to create playlists on your account, or use Copy URIs and paste into the Spotify app.'); return; }
   const base = prompt('Playlist name (a number is appended for each)', `${data.name} — shaped`);
   if (!base) return;
   const shape = FEATURES.filter(f => f.enabled).map(f => `${f.label.toLowerCase()}: ${PRESETS[f.preset]?.label ?? 'custom curve'}`).join('; ');
@@ -588,8 +594,8 @@ async function load(refetch = false) {
   const last = localStorage.getItem('lastLink') || '';
   $('#link').value = last;
   if (MODE === 'local') load();
-  else if (await getToken()) { if (last) load(); else msg('Paste a Spotify playlist or album link and press Load.'); }
-  else msg('Log in with Spotify (top right), then paste a playlist or album link.');
+  else if (last) load();
+  else msg('Paste a Spotify playlist or album link and press Load. Log in with Spotify only if you want the playlists created on your account; Copy URIs and CSV work without it.');
 })();
 </script>
 </body>

@@ -78,22 +78,28 @@ python3 spotify_sine.py --playlists 2 --hours-each 6 --cycles 1 --phase 0.75
 `--phase 0.25` at the peak, `--seed` reshuffles near-tie tracks, `--plan-only` re-plans
 from cache with no network.
 
-## Hosting it (static, no server)
+## Hosting it
 
-`index.html` also works on its own. When there is no local server it logs the visitor
-into Spotify from the browser (PKCE, no secret) and calls Spotify and ReccoBeats
-directly. Push the repo to Vercel, Netlify, or GitHub Pages as a static site; the
-included `vercel.json` and `.vercelignore` keep Vercel from treating `server.py` as a
+`index.html` also works without the Python server. Push the repo to Vercel as a static
+site; `vercel.json` and `.vercelignore` keep Vercel from treating `server.py` as a
 serverless function.
 
-Then in the Spotify developer dashboard, on the app whose Client ID is in `index.html`:
+**Reading playlists needs no login.** `api/tracks.js` is a small Vercel function that
+reads any public playlist or album with the app's own client-credentials token, which
+doesn't count as a user. In the Vercel project settings add two environment variables,
+`SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET`, from any Spotify app you own, then
+redeploy. Audio features come from ReccoBeats straight from the browser. Visitors paste a
+link, shape the curves, and export CSV or URIs with no account involved.
+
+**Creating playlists does need a login.** The Log in button uses PKCE with the Client ID
+in `index.html`. For that app, in the Spotify dashboard:
 
 1. Add your site's URL as a Redirect URI, exactly as the browser shows it, with the
    trailing slash: `https://your-site.vercel.app/`.
-2. Under User Management, add the Spotify email of everyone who will use it. Apps in
-   Spotify's development mode are limited to 5 users, and extended quota is only granted
-   to registered businesses with 250k+ monthly users, so treat a hosted copy as
-   "you and a few friends." Anyone else can fork the repo and use their own Client ID.
+2. Under User Management, add the Spotify email of each person who should be able to
+   create playlists. Spotify's development mode allows 5 such users, and extended quota
+   is only granted to registered businesses with 250k+ monthly users. Everyone else uses
+   Copy URIs and pastes into the Spotify app.
 
 The hosted version has no audio estimator (that needs Python); tracks without feature
 data are listed under Unplaced.
@@ -106,6 +112,7 @@ data are listed under Unplaced.
 | `server.py` | serves the page, the cached data, and the create endpoint |
 | `spotify_sine.py` | Spotify auth, fetch, ReccoBeats lookup, CLI planner, chart |
 | `estimate_features.py` | predicts features from preview audio for tracks with none |
+| `api/tracks.js` | Vercel function: reads public playlists/albums with app credentials, no user login |
 | `config.example.json` | template for `config.json` |
 
 `config.json`, `token.json`, the `cache/` and `previews/` folders, and `features.json`
