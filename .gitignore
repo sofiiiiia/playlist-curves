@@ -1,0 +1,13 @@
+# personal / secret
+config.json
+token.json
+# caches and outputs
+/playlist_tracks.json
+/features.json
+/plan_*.csv
+/valence_plan.png
+*.log
+# env
+.venv/
+__pycache__/
+.DS_Store

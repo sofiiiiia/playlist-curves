@@ -1,0 +1,2 @@
+# Only needed for the CLI's chart; the web editor and everything else use the standard library.
+matplotlib

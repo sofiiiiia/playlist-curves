@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Playlist curve editor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    color-scheme: light dark;
+    --surface: #fcfcfb; --page: #f9f9f7; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10); --ok: #006300;
+    --c-valence: #2a78d6; --c-tempo: #eb6834; --c-energy: #1baf7a; --c-danceability: #eda100;
+    --c-acousticness: #e87ba4; --c-instrumentalness: #008300; --c-loudness: #4a3aa7; --c-speechiness: #e34948;
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --surface: #1a1a19; --page: #0d0d0d; --ink: #fff; --ink2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --ok: #0ca30c;
+    --c-valence: #3987e5; --c-tempo: #d95926; --c-energy: #199e70; --c-danceability: #c98500;
+    --c-acousticness: #d55181; --c-instrumentalness: #008300; --c-loudness: #9085e9; --c-speechiness: #e66767;
+  } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.4 -apple-system, "Inter", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+  header { padding: 14px 20px 8px; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+  h1 { font-size: 16px; margin: 0 12px 0 0; font-weight: 600; }
+  .sub { color: var(--ink2); font-size: 13px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 6px 20px; }
+  label { color: var(--ink2); font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
+  input[type=number], select, button { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; }
+  input[type=number] { width: 64px; }
+  button { cursor: pointer; } button:hover { border-color: var(--muted); } button.primary { border-color: var(--ink); }
+  button:disabled { opacity: .5; cursor: default; }
+  .tabs button { border-radius: 999px; padding: 3px 12px; } .tabs button[aria-selected=true] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 20px 10px; }
+  .chip { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  .chip .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .chip.off { opacity: .55; }
+  .chip input[type=range] { width: 70px; }
+  .chip select { padding: 2px 4px; font-size: 12px; }
+  main { padding: 0 20px 30px; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin: 10px 0; padding: 8px 10px 4px; position: relative; }
+  .panel h2 { font-size: 13px; margin: 0 0 2px 6px; font-weight: 600; display: flex; gap: 14px; align-items: baseline; }
+  .panel h2 .legend { color: var(--ink2); font-weight: 400; font-size: 12px; display: inline-flex; gap: 12px; }
+  .legend i { display: inline-block; width: 14px; height: 2px; vertical-align: middle; margin-right: 4px; }
+  .legend b { display: inline-block; width: 7px; height: 7px; border-radius: 50%; vertical-align: middle; margin-right: 4px; }
+  svg { display: block; width: 100%; height: 190px; touch-action: none; }
+  .grid line { stroke: var(--grid); }
+  .axis line, .axis path { stroke: var(--axis); fill: none; }
+  .axis text { fill: var(--muted); font-size: 11px; }
+  .target { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .actual { fill: none; stroke-width: 1.5; opacity: .55; }
+  .dot { stroke: var(--surface); stroke-width: 1.5; }
+  .handle { stroke: var(--surface); stroke-width: 2; cursor: ns-resize; }
+  .handle:hover, .handle.active { stroke-width: 3; }
+  .hit { fill: transparent; cursor: ns-resize; }
+  .cross { stroke: var(--muted); stroke-dasharray: 3 3; pointer-events: none; }
+  .tip { position: fixed; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); max-width: 280px; z-index: 5; }
+  .tip .t { font-weight: 600; } .tip .a { color: var(--ink2); margin-bottom: 4px; }
+  .tip table { border-collapse: collapse; } .tip td { padding: 1px 6px 1px 0; color: var(--ink2); } .tip td.v { color: var(--ink); text-align: right; }
+  .stats { display: flex; gap: 20px; flex-wrap: wrap; color: var(--ink2); font-size: 13px; padding: 4px 20px; }
+  .stats b { color: var(--ink); font-weight: 600; }
+  details { margin: 12px 0; } summary { cursor: pointer; color: var(--ink2); }
+  table.list { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+  table.list th, table.list td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--grid); }
+  table.list th { color: var(--muted); font-weight: 500; font-size: 12px; } table.list td.n { text-align: right; color: var(--ink2); }
+  #msg { color: var(--ink2); font-size: 13px; } #msg a { color: var(--ink); }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Playlist curve editor</h1>
+  <span class="sub" id="subtitle">loading…</span>
+</header>
+<div class="row">
+  <label>Playlists <input type="number" id="nPl" min="1" max="4" value="2"></label>
+  <label>Hours each <input type="number" id="hours" min="0.5" max="24" step="0.5" value="6"></label>
+  <span class="tabs" id="tabs"></span>
+  <span style="flex:1"></span>
+  <button id="btnCsv">Download CSVs</button>
+  <button id="btnUris">Copy URIs</button>
+  <button id="btnCreate" class="primary">Create on Spotify</button>
+  <button id="btnRefetch" title="Re-pull the source playlist from Spotify">Refetch</button>
+</div>
+<div class="row"><span id="msg"></span></div>
+<div class="chips" id="chips"></div>
+<div class="stats" id="stats"></div>
+<main id="panels"></main>
+<div class="tip" id="tip" hidden></div>
+<main>
+  <details open><summary id="listSummary">Track order</summary><div id="list"></div></details>
+  <details><summary id="unplacedSummary">Unplaced tracks</summary><div id="unplaced"></div></details>
+</main>
+
+<script>
+// ---------- feature definitions (fixed color order, never cycled) ----------
+const FEATURES = [
+  { key: 'valence',          label: 'Valence',          min: 0,   max: 1,   unit: '',    enabled: true,  weight: 1 },
+  { key: 'tempo',            label: 'Tempo',            min: 60,  max: 220, unit: ' BPM', enabled: false, weight: 1 },
+  { key: 'energy',           label: 'Energy',           min: 0,   max: 1,   unit: '',    enabled: false, weight: 1 },
+  { key: 'danceability',     label: 'Danceability',     min: 0,   max: 1,   unit: '',    enabled: false, weight: 1 },
+  { key: 'acousticness',     label: 'Acousticness',     min: 0,   max: 1,   unit: '',    enabled: false, weight: 1 },
+  { key: 'instrumentalness', label: 'Instrumentalness', min: 0,   max: 1,   unit: '',    enabled: false, weight: 1 },
+  { key: 'loudness',         label: 'Loudness',         min: -20, max: -4,  unit: ' dB', enabled: false, weight: 1 },
+  { key: 'speechiness',      label: 'Speechiness',      min: 0,   max: 0.6, unit: '',    enabled: false, weight: 1 },
+];
+const PRESETS = {
+  sine:   { label: 'Sine (mid → peak → trough)', f: t => 0.5 + 0.5 * Math.sin(2 * Math.PI * t) },
+  sineT:  { label: 'Sine from trough',            f: t => 0.5 - 0.5 * Math.cos(2 * Math.PI * t) },
+  sine2:  { label: 'Two sine cycles',             f: t => 0.5 + 0.5 * Math.sin(4 * Math.PI * t) },
+  hill:   { label: 'Hill (low → high → low)',     f: t => Math.sin(Math.PI * t) },
+  valley: { label: 'Valley (high → low → high)',  f: t => 1 - Math.sin(Math.PI * t) },
+  rise:   { label: 'Rise',                        f: t => t },
+  fall:   { label: 'Fall',                        f: t => 1 - t },
+  flat:   { label: 'Flat',                        f: () => 0.5 },
+};
+const NPOINTS = 9;
+const norm = (f, v) => (v - f.min) / (f.max - f.min);
+const denorm = (f, u) => f.min + u * (f.max - f.min);
+const fmt = (f, v) => f.key === 'tempo' ? Math.round(v) + f.unit : f.key === 'loudness' ? v.toFixed(1) + f.unit : v.toFixed(2);
+const hhmm = ms => { const m = Math.floor(ms / 60000); return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`; };
+
+// ---------- state ----------
+let data = null, pool = [], unplaced = [], plans = [], selected = 0;
+const state = { nPl: 2, hours: 6 };
+
+// ---------- monotone cubic interpolation through control points ----------
+function interp(ys) {
+  const n = ys.length, xs = ys.map((_, i) => i / (n - 1));
+  const d = [], m = [];
+  for (let i = 0; i < n - 1; i++) d.push((ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i]));
+  m[0] = d[0]; m[n - 1] = d[n - 2];
+  for (let i = 1; i < n - 1; i++) m[i] = d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2;
+  for (let i = 0; i < n - 1; i++) { // Fritsch–Carlson limiter
+    if (d[i] === 0) { m[i] = m[i + 1] = 0; continue; }
+    const a = m[i] / d[i], b = m[i + 1] / d[i], s = a * a + b * b;
+    if (s > 9) { const tau = 3 / Math.sqrt(s); m[i] = tau * a * d[i]; m[i + 1] = tau * b * d[i]; }
+  }
+  return t => {
+    t = Math.min(1, Math.max(0, t));
+    let i = Math.min(n - 2, Math.floor(t * (n - 1)));
+    const h = xs[i + 1] - xs[i], s = (t - xs[i]) / h, s2 = s * s, s3 = s2 * s;
+    return (2 * s3 - 3 * s2 + 1) * ys[i] + (s3 - 2 * s2 + s) * h * m[i] + (-2 * s3 + 3 * s2) * ys[i + 1] + (s3 - s2) * h * m[i + 1];
+  };
+}
+
+// ---------- Hungarian assignment: n rows (slots) <= m cols (tracks), flat cost array ----------
+function hungarian(cost, n, m) {
+  const INF = 1e18, W = m + 1;
+  const u = new Float64Array(n + 1), v = new Float64Array(m + 1), p = new Int32Array(m + 1), way = new Int32Array(m + 1);
+  for (let i = 1; i <= n; i++) {
+    p[0] = i; let j0 = 0;
+    const minv = new Float64Array(m + 1).fill(INF), used = new Uint8Array(m + 1);
+    do {
+      used[j0] = 1; const i0 = p[j0]; let delta = INF, j1 = 0;
+      for (let j = 1; j <= m; j++) if (!used[j]) {
+        const cur = cost[i0 * W + j] - u[i0] - v[j];
+        if (cur < minv[j]) { minv[j] = cur; way[j] = j0; }
+        if (minv[j] < delta) { delta = minv[j]; j1 = j; }
+      }
+      for (let j = 0; j <= m; j++) if (used[j]) { u[p[j]] += delta; v[j] -= delta; } else minv[j] -= delta;
+      j0 = j1;
+    } while (p[j0] !== 0);
+    do { const j1 = way[j0]; p[j0] = p[j1]; j0 = j1; } while (j0);
+  }
+  const ans = new Int32Array(n + 1);
+  for (let j = 1; j <= m; j++) if (p[j]) ans[p[j]] = j;
+  return ans; // ans[row] = col (1-based)
+}
+
+// ---------- planner ----------
+function solve() {
+  const active = FEATURES.filter(f => f.enabled && f.weight > 0);
+  const P = state.nPl, T = state.hours * 3.6e6, n = pool.length;
+  if (!n || !active.length) { plans = Array.from({ length: P }, () => []); return; }
+  const avg = pool.reduce((s, t) => s + t.duration, 0) / n;
+  let K = Math.max(1, Math.round(T / avg));
+  if (K * P > n) K = Math.floor(n / P);
+  const curves = active.map(f => ({ f, g: interp(f.points) }));
+  let slotTimes = Array.from({ length: P }, () => Array.from({ length: K }, (_, k) => (k + 0.5) * avg));
+  for (let pass = 0; pass < 2; pass++) {
+    const rows = P * K, W = n + 1, cost = new Float64Array((rows + 1) * W);
+    const targets = [];
+    for (let p = 0; p < P; p++) for (let k = 0; k < K; k++) {
+      const r = p * K + k + 1, t01 = slotTimes[p][k] / T;
+      const tg = curves.map(c => c.g(t01)); targets[r] = tg;
+      for (let j = 1; j <= n; j++) {
+        const tr = pool[j - 1]; let c = 0;
+        for (let q = 0; q < active.length; q++) c += active[q].weight * Math.abs(norm(active[q], tr.features[active[q].key]) - tg[q]);
+        cost[r * W + j] = c;
+      }
+    }
+    const ans = hungarian(cost, rows, n);
+    // Slots at the same index k share (nearly) the same target across playlists, so the
+    // assignment is indifferent to which playlist gets the better of two near-equal tracks.
+    // Rotate by k so first pick alternates instead of always favoring playlist 1.
+    const picked = Array.from({ length: P }, (_, p) => Array.from({ length: K }, (_, k) => pool[ans[((p + k) % P) * K + k + 1] - 1]));
+    plans = picked.map(order => {
+      let t = 0;
+      return order.map(tr => {
+        const mid = (t + tr.duration / 2) / T, targ = {};
+        curves.forEach(c => targ[c.f.key] = denorm(c.f, c.g(mid)));
+        const o = { ...tr, start: t, target: targ }; t += tr.duration; return o;
+      });
+    });
+    slotTimes = plans.map(order => order.map(o => o.start + o.duration / 2));
+  }
+}
+
+// ---------- rendering ----------
+const $ = s => document.querySelector(s);
+const svgNS = 'http://www.w3.org/2000/svg';
+const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(svgNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+const color = f => `var(--c-${f.key})`;
+const M = { l: 56, r: 16, t: 10, b: 26 };
+let solveTimer = null;
+
+function renderChips() {
+  const box = $('#chips'); box.innerHTML = '';
+  for (const f of FEATURES) {
+    const chip = document.createElement('div'); chip.className = 'chip' + (f.enabled ? '' : ' off');
+    chip.innerHTML = `<span class="sw" style="background:${color(f)}"></span>
+      <label><input type="checkbox" ${f.enabled ? 'checked' : ''}> ${f.label}</label>
+      <label title="weight">w <input type="range" min="0" max="3" step="0.25" value="${f.weight}"></label>
+      <select title="preset shape">${Object.entries(PRESETS).map(([k, p]) => `<option value="${k}" ${f.preset === k ? 'selected' : ''}>${p.label}</option>`).join('')}</select>`;
+    const [cb, rg, sel] = [chip.querySelector('input[type=checkbox]'), chip.querySelector('input[type=range]'), chip.querySelector('select')];
+    cb.onchange = () => { f.enabled = cb.checked; chip.classList.toggle('off', !f.enabled); rebuild(); };
+    rg.oninput = () => { f.weight = +rg.value; scheduleSolve(0); };
+    sel.onchange = () => { applyPreset(f, sel.value); rebuild(); };
+    box.appendChild(chip);
+  }
+}
+
+function applyPreset(f, key) {
+  f.preset = key;
+  // Fit the shape inside what the pool can deliver: 5th–95th percentile of this feature.
+  const vs = pool.map(t => t.features[f.key]).sort((a, b) => a - b);
+  const lo = norm(f, vs[Math.floor(vs.length * 0.05)] ?? f.min), hi = norm(f, vs[Math.ceil(vs.length * 0.95) - 1] ?? f.max);
+  f.points = Array.from({ length: NPOINTS }, (_, i) => lo + (hi - lo) * PRESETS[key].f(i / (NPOINTS - 1)));
+}
+
+function renderPanels() {
+  const box = $('#panels'); box.innerHTML = '';
+  const active = FEATURES.filter(f => f.enabled);
+  for (const f of active) {
+    const panel = document.createElement('div'); panel.className = 'panel';
+    panel.innerHTML = `<h2>${f.label}<span class="legend"><span><i style="background:${color(f)}"></i>target (drag the handles)</span><span><b style="background:${color(f)}"></b>tracks in playlist ${selected + 1}</span></span></h2>`;
+    const svg = el('svg', { viewBox: `0 0 900 190` }); panel.appendChild(svg);
+    box.appendChild(panel); drawPanel(svg, f);
+  }
+}
+
+function drawPanel(svg, f) {
+  svg.innerHTML = '';
+  const W = Math.max(600, Math.round(svg.getBoundingClientRect().width || 900)), Hh = 190;
+  svg.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
+  const x0 = M.l, x1 = W - M.r, y0 = M.t, y1 = Hh - M.b;
+  const T = state.hours * 3.6e6;
+  const X = ms => x0 + (x1 - x0) * ms / T, Y = u => y1 - (y1 - y0) * Math.min(1, Math.max(0, u));
+  const grid = el('g', { class: 'grid' }, svg), axis = el('g', { class: 'axis' }, svg);
+  for (const u of [0, 0.5, 1]) {
+    el('line', { x1: x0, x2: x1, y1: Y(u), y2: Y(u) }, grid);
+    const t = el('text', { x: x0 - 8, y: Y(u) + 4, 'text-anchor': 'end' }, axis); t.textContent = fmt(f, denorm(f, u));
+  }
+  el('line', { x1: x0, x2: x1, y1: y1, y2: y1 }, axis);
+  for (let h = 0; h <= state.hours; h += state.hours > 8 ? 2 : 1) {
+    const t = el('text', { x: X(h * 3.6e6), y: y1 + 16, 'text-anchor': 'middle' }, axis); t.textContent = h + 'h';
+  }
+  // actual tracks
+  const order = plans[selected] || [];
+  if (order.length) {
+    const pts = order.map(o => [X(o.start + o.duration / 2), Y(norm(f, o.features[f.key]))]);
+    el('path', { class: 'actual', stroke: color(f), d: 'M' + pts.map(p => p.join(',')).join('L') }, svg);
+    const g = el('g', {}, svg);
+    pts.forEach(p => el('circle', { class: 'dot', cx: p[0], cy: p[1], r: 3.2, fill: color(f) }, g));
+  }
+  // target curve
+  const g = interp(f.points), steps = 120;
+  const d = Array.from({ length: steps + 1 }, (_, i) => { const t = i / steps; return `${X(t * T).toFixed(1)},${Y(g(t)).toFixed(1)}`; });
+  el('path', { class: 'target', stroke: color(f), d: 'M' + d.join('L') }, svg);
+  // handles
+  f.points.forEach((u, i) => {
+    const cx = X(i / (NPOINTS - 1) * T), cy = Y(u);
+    const hit = el('rect', { class: 'hit', x: cx - 14, y: y0 - 6, width: 28, height: y1 - y0 + 12 }, svg);
+    const h = el('circle', { class: 'handle', cx, cy, r: 6.5, fill: color(f) }, svg);
+    const start = ev => {
+      ev.preventDefault(); h.classList.add('active'); hideTip();
+      const move = e => {
+        const r = svg.getBoundingClientRect(); const yy = (e.clientY - r.top) * Hh / r.height;
+        f.points[i] = Math.min(1, Math.max(0, (y1 - yy) / (y1 - y0)));
+        f.preset = 'custom'; drawPanel(svg, f); scheduleSolve(80);
+      };
+      const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); h.classList.remove('active'); scheduleSolve(0); };
+      window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+    };
+    hit.addEventListener('pointerdown', start); h.addEventListener('pointerdown', start);
+  });
+  // hover crosshair / tooltip
+  const cross = el('line', { class: 'cross', x1: 0, x2: 0, y1: y0, y2: y1, visibility: 'hidden' }, svg);
+  svg.addEventListener('pointermove', e => {
+    if (e.buttons) return;
+    const r = svg.getBoundingClientRect(); const xx = (e.clientX - r.left) * W / r.width;
+    const ms = (xx - x0) / (x1 - x0) * T;
+    const o = order.find(o => ms >= o.start && ms < o.start + o.duration);
+    document.querySelectorAll('.cross').forEach(c => { c.setAttribute('x1', xx); c.setAttribute('x2', xx); c.setAttribute('visibility', o ? 'visible' : 'hidden'); });
+    if (o) showTip(e, o); else hideTip();
+  });
+  svg.addEventListener('pointerleave', () => { document.querySelectorAll('.cross').forEach(c => c.setAttribute('visibility', 'hidden')); hideTip(); });
+}
+
+function showTip(e, o) {
+  const tip = $('#tip'); tip.hidden = false;
+  const rows = FEATURES.filter(f => f.enabled).map(f => `<tr><td>${f.label}</td><td class="v">${fmt(f, o.features[f.key])}</td><td>target ${fmt(f, o.target[f.key])}</td></tr>`).join('');
+  tip.innerHTML = `<div class="t">${o.title}</div><div class="a">${o.artist} · starts ${hhmm(o.start)}</div><table>${rows}</table>`;
+  const x = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 10);
+  tip.style.left = x + 'px'; tip.style.top = (e.clientY + 14) + 'px';
+}
+function hideTip() { $('#tip').hidden = true; }
+
+function renderTabs() {
+  const box = $('#tabs'); box.innerHTML = '';
+  plans.forEach((_, i) => { const b = document.createElement('button'); b.textContent = `Playlist ${i + 1}`; b.setAttribute('aria-selected', i === selected); b.onclick = () => { selected = i; renderAll(false); }; box.appendChild(b); });
+}
+
+function renderStats() {
+  const active = FEATURES.filter(f => f.enabled);
+  $('#stats').innerHTML = plans.map((o, i) => {
+    const dur = o.reduce((s, t) => s + t.duration, 0) / 3.6e6;
+    const miss = active.map(f => `${f.label.toLowerCase()} miss <b>${(o.reduce((s, t) => s + Math.abs(norm(f, t.features[f.key]) - norm(f, t.target[f.key])), 0) / Math.max(1, o.length)).toFixed(3)}</b>`).join(' · ');
+    return `<span>Playlist ${i + 1}: <b>${o.length}</b> tracks, <b>${dur.toFixed(2)} h</b> · ${miss}</span>`;
+  }).join('');
+}
+
+function renderList() {
+  const active = FEATURES.filter(f => f.enabled), o = plans[selected] || [];
+  $('#listSummary').textContent = `Track order · playlist ${selected + 1} (${o.length} tracks)`;
+  $('#list').innerHTML = `<table class="list"><tr><th>#</th><th>Start</th><th>Title</th><th>Artist</th>${active.map(f => `<th>${f.label}</th>`).join('')}</tr>` +
+    o.map((t, i) => `<tr><td class="n">${i + 1}</td><td class="n">${hhmm(t.start)}</td><td>${t.title}</td><td>${t.artist}</td>${active.map(f => `<td class="n">${fmt(f, t.features[f.key])}</td>`).join('')}</tr>`).join('') + '</table>';
+  const used = new Set(plans.flat().map(t => t.id));
+  const left = pool.filter(t => !used.has(t.id));
+  $('#unplacedSummary').textContent = `Unplaced tracks · ${unplaced.length} without feature data, ${left.length} not needed for the chosen length`;
+  $('#unplaced').innerHTML = `<table class="list"><tr><th>Title</th><th>Artist</th><th>Why</th></tr>` +
+    unplaced.map(t => `<tr><td>${t.title}</td><td>${t.artist}</td><td>no audio features available</td></tr>`).join('') +
+    left.map(t => `<tr><td>${t.title}</td><td>${t.artist}</td><td>playlists are full</td></tr>`).join('') + '</table>';
+}
+
+function renderAll(resolve = true) {
+  if (resolve) solve();
+  renderTabs(); renderStats(); renderPanels(); renderList();
+}
+function rebuild() { renderAll(true); }
+function scheduleSolve(ms) {
+  clearTimeout(solveTimer);
+  solveTimer = setTimeout(() => { solve(); renderStats(); document.querySelectorAll('.panel svg').forEach((svg, i) => drawPanel(svg, FEATURES.filter(f => f.enabled)[i])); renderList(); }, ms);
+}
+
+// ---------- export ----------
+function csvFor(o) {
+  const active = FEATURES.filter(f => f.enabled);
+  const head = ['pos', 'start', 'title', 'artist', ...active.flatMap(f => [f.key, f.key + '_target']), 'uri'];
+  const esc = s => `"${String(s).replace(/"/g, '""')}"`;
+  return [head.join(','), ...o.map((t, i) => [i + 1, hhmm(t.start), esc(t.title), esc(t.artist), ...active.flatMap(f => [t.features[f.key], t.target[f.key].toFixed(3)]), t.uri].join(','))].join('\n');
+}
+$('#btnCsv').onclick = () => plans.forEach((o, i) => {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csvFor(o)], { type: 'text/csv' })); a.download = `playlist_${i + 1}.csv`; a.click();
+});
+$('#btnUris').onclick = async () => {
+  await navigator.clipboard.writeText((plans[selected] || []).map(t => t.uri).join('\n'));
+  msg(`Copied ${plans[selected].length} URIs for playlist ${selected + 1}. In the Spotify desktop app, open a playlist and paste.`);
+};
+$('#btnCreate').onclick = async () => {
+  const base = prompt('Playlist name (a number is appended for each)', `${data.name} — shaped`);
+  if (!base) return;
+  const shape = FEATURES.filter(f => f.enabled).map(f => `${f.label.toLowerCase()}: ${PRESETS[f.preset]?.label ?? 'custom curve'}`).join('; ');
+  $('#btnCreate').disabled = true; msg('Creating on Spotify…');
+  try {
+    const r = await fetch('/api/create', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playlists: plans.map((o, i) => ({ name: `${base} ${i + 1}/${plans.length}`, description: shape, uris: o.map(t => t.uri) })) }) });
+    const j = await r.json();
+    if (j.error) throw new Error(j.error);
+    msg('Created: ' + j.created.map(c => `<a href="${c.url}" target="_blank">${c.name}</a> (${c.count} tracks)`).join(' · '));
+  } catch (e) { msg('Failed: ' + e.message); }
+  $('#btnCreate').disabled = false;
+};
+$('#btnRefetch').onclick = () => load(true);
+$('#nPl').onchange = e => { state.nPl = Math.max(1, Math.min(4, +e.target.value)); selected = 0; rebuild(); };
+$('#hours').onchange = e => { state.hours = Math.max(0.5, +e.target.value); rebuild(); };
+function msg(html) { $('#msg').innerHTML = html; }
+
+// ---------- load ----------
+async function load(refetch = false) {
+  msg(refetch ? 'Refetching from Spotify…' : '');
+  data = await (await fetch('/api/data' + (refetch ? '?refetch=1' : ''))).json();
+  pool = data.tracks.filter(t => t.features); unplaced = data.tracks.filter(t => !t.features);
+  const total = data.tracks.reduce((s, t) => s + t.duration, 0) / 3.6e6;
+  $('#title').textContent = data.name;
+  $('#subtitle').textContent = `${data.tracks.length} tracks · ${total.toFixed(1)} h · ${pool.length} with audio features`;
+  FEATURES.forEach(f => applyPreset(f, f.preset || (f.key === 'valence' ? 'sine' : 'flat')));
+  renderChips(); rebuild(); if (refetch) msg('Refetched.');
+}
+load();
+</script>
+</body>
+</html>
