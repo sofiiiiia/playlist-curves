@@ -1,0 +1,11 @@
+*.py
+*.txt
+cache/
+previews/
+.venv/
+__pycache__/
+config.json
+token.json
+features.json
+plan_*.csv
+*.log

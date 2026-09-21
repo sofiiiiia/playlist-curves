@@ -41,6 +41,8 @@ class H(BaseHTTPRequestHandler):
 
     def do_GET(self):
         p = urllib.parse.urlparse(self.path)
+        if p.path == "/api/ping":
+            return self._json({"ok": True})
         if p.path == "/api/data":
             q = urllib.parse.parse_qs(p.query)
             try:

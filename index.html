@@ -65,6 +65,7 @@
   table.list th, table.list td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--grid); }
   table.list th { color: var(--muted); font-weight: 500; font-size: 12px; } table.list td.n { text-align: right; color: var(--ink2); }
   .est { color: var(--muted); font-weight: 400; font-size: 11px; }
+  footer { padding: 16px 20px 28px; color: var(--muted); font-size: 12px; } footer a { color: var(--ink2); }
   #msg { color: var(--ink2); font-size: 13px; } #msg a { color: var(--ink); }
 </style>
 </head>
@@ -74,6 +75,8 @@
   <input type="url" id="link" placeholder="Paste a Spotify playlist or album link" spellcheck="false">
   <button id="btnLoad" class="primary">Load</button>
   <span class="sub" id="subtitle"></span>
+  <span style="flex:1"></span>
+  <button id="btnAuth" hidden>Log in with Spotify</button>
 </header>
 <div class="row">
   <label>Playlists <input type="number" id="nPl" min="1" max="4" value="2"></label>
@@ -95,6 +98,12 @@
   <details open><summary id="listSummary">Track order</summary><div id="list"></div></details>
   <details><summary id="unplacedSummary">Unplaced tracks</summary><div id="unplaced"></div></details>
 </main>
+<footer>
+  Track data from <a href="https://open.spotify.com" target="_blank" rel="noopener">Spotify</a> and
+  <a href="https://reccobeats.com" target="_blank" rel="noopener">ReccoBeats</a>.
+  Playlists are created privately on your own account. Nothing is stored anywhere but your browser.
+  <a href="https://github.com/sofiiiiia/playlist-curves" target="_blank" rel="noopener">Source</a>
+</footer>
 
 <script>
 // ---------- feature definitions (fixed color order, never cycled) ----------
@@ -358,6 +367,156 @@ function scheduleSolve(ms) {
   solveTimer = setTimeout(() => { solve(); renderStats(); document.querySelectorAll('.panel svg').forEach((svg, i) => drawPanel(svg, FEATURES.filter(f => f.enabled)[i])); renderList(); }, ms);
 }
 
+// ---------- backend: local server if present, otherwise talk to Spotify + ReccoBeats directly ----------
+// Public by design (PKCE needs no secret). Fork? Put your own app's Client ID here and add your
+// site's URL as a redirect URI in the Spotify dashboard.
+const CLIENT_ID = '64320662ddc54d259554a616b4a41a45';
+const SCOPES = 'playlist-read-private playlist-read-collaborative playlist-modify-public playlist-modify-private';
+const FEAT_KEYS = ['valence', 'energy', 'danceability', 'tempo', 'acousticness', 'instrumentalness', 'loudness', 'speechiness'];
+let MODE = 'static';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function detectMode() {
+  try { const r = await fetch('/api/ping', { cache: 'no-store' }); MODE = r.ok && (await r.json()).ok ? 'local' : 'static'; }
+  catch { MODE = 'static'; }
+}
+
+// --- PKCE login, token kept in this browser only ---
+const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const redirectUri = () => location.origin + location.pathname;
+async function login() {
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(64)));
+  const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
+  sessionStorage.setItem('pkce_verifier', verifier);
+  location.href = 'https://accounts.spotify.com/authorize?' + new URLSearchParams({
+    client_id: CLIENT_ID, response_type: 'code', redirect_uri: redirectUri(), scope: SCOPES,
+    code_challenge_method: 'S256', code_challenge: challenge });
+}
+async function tokenRequest(params) {
+  const r = await fetch('https://accounts.spotify.com/api/token', { method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: CLIENT_ID, ...params }) });
+  const j = await r.json();
+  if (!j.access_token) throw new Error(j.error_description || j.error || 'token request failed');
+  j.expires_at = Date.now() + j.expires_in * 1000;
+  return j;
+}
+async function handleCallback() {
+  const q = new URLSearchParams(location.search);
+  if (!q.get('code') && !q.get('error')) return;
+  history.replaceState({}, '', location.pathname);
+  if (q.get('error')) { msg('Spotify login was cancelled: ' + q.get('error')); return; }
+  try {
+    const j = await tokenRequest({ grant_type: 'authorization_code', code: q.get('code'), redirect_uri: redirectUri(), code_verifier: sessionStorage.getItem('pkce_verifier') });
+    localStorage.setItem('spotifyToken', JSON.stringify(j));
+  } catch (e) { msg('Login failed: ' + e.message); }
+}
+async function getToken() {
+  let t = JSON.parse(localStorage.getItem('spotifyToken') || 'null');
+  if (!t) return null;
+  if (t.expires_at - Date.now() < 60000) {
+    try { const j = await tokenRequest({ grant_type: 'refresh_token', refresh_token: t.refresh_token }); j.refresh_token ??= t.refresh_token; t = j; localStorage.setItem('spotifyToken', JSON.stringify(t)); }
+    catch { localStorage.removeItem('spotifyToken'); return null; }
+  }
+  return t.access_token;
+}
+function logout() { localStorage.removeItem('spotifyToken'); renderAuth(); msg('Logged out.'); }
+async function renderAuth() {
+  const b = $('#btnAuth');
+  if (MODE === 'local') { b.hidden = true; return; }
+  const tok = await getToken(); b.hidden = false;
+  b.textContent = tok ? 'Log out' : 'Log in with Spotify'; b.onclick = tok ? logout : login;
+}
+
+// --- Spotify Web API from the browser ---
+async function sp(path, opts = {}) {
+  const tok = await getToken();
+  if (!tok) throw new Error('Log in with Spotify first (button top right).');
+  const r = await fetch(path.startsWith('http') ? path : 'https://api.spotify.com/v1/' + path,
+    { ...opts, headers: { Authorization: 'Bearer ' + tok, ...(opts.body ? { 'Content-Type': 'application/json' } : {}) } });
+  if (r.status === 429) { await sleep((+r.headers.get('Retry-After') || 2) * 1000); return sp(path, opts); }
+  if (r.status === 401) { localStorage.removeItem('spotifyToken'); renderAuth(); throw new Error('Spotify session expired. Log in again.'); }
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error((e.error && e.error.message) || `Spotify returned ${r.status}` +
+      (r.status === 403 ? '. This app is in Spotify development mode: your account must be added under User Management in the developer dashboard.' : ''));
+  }
+  return r.status === 204 ? {} : r.json();
+}
+function parseLink(link) {
+  link = (link || '').trim();
+  const m = link.match(/open\.spotify\.com\/(?:intl-[a-z]+\/)?(playlist|album)\/([A-Za-z0-9]+)/) || link.match(/spotify:(playlist|album):([A-Za-z0-9]+)/);
+  if (m) return { kind: m[1], id: m[2] };
+  if (/^[A-Za-z0-9]{22}$/.test(link)) return { kind: 'playlist', id: link };
+  throw new Error('Not a Spotify playlist or album link');
+}
+const rowOf = t => ({ id: t.id, uri: t.uri, title: t.name, artist: t.artists.map(a => a.name).join(', '), duration: t.duration_ms });
+async function fetchTracksDirect(link) {
+  const { kind, id } = parseLink(link), tracks = [];
+  let name, url;
+  if (kind === 'playlist') {
+    name = (await sp(`playlists/${id}?fields=name`)).name;
+    url = `https://api.spotify.com/v1/playlists/${id}/items?limit=100&fields=next,items(item(id,uri,name,duration_ms,artists(name)))`;
+    while (url) { const page = await sp(url); for (const it of page.items) if (it.item && it.item.id) tracks.push(rowOf(it.item)); url = page.next; }
+  } else {
+    name = (await sp(`albums/${id}`)).name;
+    url = `https://api.spotify.com/v1/albums/${id}/tracks?limit=50`;
+    while (url) { const page = await sp(url); for (const t of page.items) if (t && t.id) tracks.push(rowOf(t)); url = page.next; }
+  }
+  return { name, kind, id, url: `https://open.spotify.com/${kind}/${id}`, tracks };
+}
+
+// --- ReccoBeats (mirror of Spotify's audio features) from the browser, cached in localStorage ---
+async function rb(url) { const r = await fetch(url, { headers: { Accept: 'application/json' } }); if (!r.ok) throw new Error('ReccoBeats returned ' + r.status); return r.json(); }
+const pickFeats = c => Object.fromEntries(FEAT_KEYS.map(k => [k, c[k]]));
+async function fetchFeaturesDirect(tracks, refetch) {
+  const cache = refetch ? {} : JSON.parse(localStorage.getItem('featureCache') || '{}');
+  const missing = tracks.filter(t => !(t.id in cache)).map(t => t.id);
+  for (let i = 0; i < missing.length; i += 40) {
+    const b = missing.slice(i, i + 40), found = {};
+    for (const c of (await rb('https://api.reccobeats.com/v1/audio-features?ids=' + b.join(','))).content || []) found[c.href.split('/').pop()] = c;
+    for (const id of b) cache[id] = found[id] ? pickFeats(found[id]) : null;
+    msg(`Looking up audio features… ${Math.min(i + 40, missing.length)}/${missing.length}`);
+  }
+  for (const t of tracks) {  // retry unknown ids by title + artist (other release of the same song)
+    if (cache[t.id] !== null || cache['s:' + t.id]) continue;
+    cache['s:' + t.id] = 1;
+    try {
+      const title = t.title.split(' - ')[0].split(' (')[0].trim(), a0 = t.artist.split(',')[0].trim().toLowerCase();
+      const r = await rb('https://api.reccobeats.com/v1/track/search?searchText=' + encodeURIComponent(title) + '&size=10');
+      const hit = (r.content || []).find(c => (c.artists || []).some(a => a.name.toLowerCase().includes(a0)));
+      if (hit) cache[t.id] = pickFeats(await rb(`https://api.reccobeats.com/v1/track/${hit.id}/audio-features`));
+    } catch { /* leave null */ }
+  }
+  try { localStorage.setItem('featureCache', JSON.stringify(cache)); } catch { /* quota; fine */ }
+  return cache;
+}
+
+const api = {
+  async data(link, refetch) {
+    if (MODE === 'local') {
+      const d = await (await fetch(`/api/data?link=${encodeURIComponent(link)}${refetch ? '&refetch=1' : ''}`)).json();
+      if (d.error) throw new Error(d.error); return d;
+    }
+    const d = await fetchTracksDirect(link);
+    const feats = await fetchFeaturesDirect(d.tracks, refetch);
+    d.tracks.forEach(t => { t.features = feats[t.id] || null; t.estimated = false; });
+    return d;
+  },
+  async create(playlists) {
+    if (MODE === 'local') {
+      const j = await (await fetch('/api/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playlists }) })).json();
+      if (j.error) throw new Error(j.error); return j.created;
+    }
+    const out = [];
+    for (const pl of playlists) {
+      const created = await sp('me/playlists', { method: 'POST', body: JSON.stringify({ name: pl.name, public: false, description: pl.description }) });
+      for (let k = 0; k < pl.uris.length; k += 100) await sp(`playlists/${created.id}/items`, { method: 'POST', body: JSON.stringify({ uris: pl.uris.slice(k, k + 100) }) });
+      out.push({ name: pl.name, url: created.external_urls.spotify, count: pl.uris.length });
+    }
+    return out;
+  },
+};
+
 // ---------- export ----------
 function csvFor(o) {
   const active = FEATURES.filter(f => f.enabled);
@@ -378,11 +537,8 @@ $('#btnCreate').onclick = async () => {
   const shape = FEATURES.filter(f => f.enabled).map(f => `${f.label.toLowerCase()}: ${PRESETS[f.preset]?.label ?? 'custom curve'}`).join('; ');
   $('#btnCreate').disabled = true; msg('Creating on Spotify…');
   try {
-    const r = await fetch('/api/create', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playlists: plans.map((o, i) => ({ name: `${base} ${i + 1}/${plans.length}`, description: shape, uris: o.map(t => t.uri) })) }) });
-    const j = await r.json();
-    if (j.error) throw new Error(j.error);
-    msg('Created: ' + j.created.map(c => `<a href="${c.url}" target="_blank">${c.name}</a> (${c.count} tracks)`).join(' · '));
+    const created = await api.create(plans.map((o, i) => ({ name: `${base} ${i + 1}/${plans.length}`, description: shape, uris: o.map(t => t.uri) })));
+    msg('Created: ' + created.map(c => `<a href="${c.url}" target="_blank">${c.name}</a> (${c.count} tracks)`).join(' · '));
   } catch (e) { msg('Failed: ' + e.message); }
   $('#btnCreate').disabled = false;
 };
@@ -408,9 +564,8 @@ async function load(refetch = false) {
   const link = $('#link').value.trim();
   msg(refetch ? 'Refetching from Spotify…' : 'Loading…'); $('#btnLoad').disabled = true;
   try {
-    const r = await fetch(`/api/data?link=${encodeURIComponent(link)}${refetch ? '&refetch=1' : ''}`);
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
+    if (MODE === 'static' && !link) throw new Error('paste a Spotify playlist or album link first.');
+    const d = await api.data(link, refetch);
     data = d; localStorage.setItem('lastLink', d.url); $('#link').value = d.url;
     pool = data.tracks.filter(t => t.features); unplaced = data.tracks.filter(t => !t.features);
     const total = data.tracks.reduce((s, t) => s + t.duration, 0) / 3.6e6;
@@ -420,13 +575,22 @@ async function load(refetch = false) {
     // default length: whole thing in one go, rounded to the half hour, unless the user set something
     if (!state.userSetHours) { state.hours = Math.max(0.5, Math.round(total / state.nPl * 2) / 2); $('#hours').value = state.hours; }
     FEATURES.forEach(f => applyPreset(f, f.preset && f.preset !== 'custom' ? f.preset : (f.key === 'valence' ? 'sine' : 'flat')));
-    $('#btnEstimate').hidden = unplaced.length === 0;
+    $('#btnEstimate').hidden = MODE !== 'local' || unplaced.length === 0;
+    $('#btnRefetch').hidden = MODE !== 'local';
     renderChips(); rebuild(); msg(refetch ? 'Refetched.' : '');
   } catch (e) { msg('Could not load: ' + e.message); }
   $('#btnLoad').disabled = false;
 }
-$('#link').value = localStorage.getItem('lastLink') || '';
-load();
+(async () => {
+  await detectMode();
+  if (MODE === 'static') await handleCallback();
+  await renderAuth();
+  const last = localStorage.getItem('lastLink') || '';
+  $('#link').value = last;
+  if (MODE === 'local') load();
+  else if (await getToken()) { if (last) load(); else msg('Paste a Spotify playlist or album link and press Load.'); }
+  else msg('Log in with Spotify (top right), then paste a playlist or album link.');
+})();
 </script>
 </body>
 </html>
