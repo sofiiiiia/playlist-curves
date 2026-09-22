@@ -1,5 +1,5 @@
 *.py
-*.txt
+local-requirements.txt
 cache/
 previews/
 .venv/
@@ -9,3 +9,4 @@ token.json
 features.json
 plan_*.csv
 *.log
+docs/

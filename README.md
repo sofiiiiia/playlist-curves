@@ -45,7 +45,7 @@ You need Python 3.10+ and a free Spotify developer app.
    to exactly `http://127.0.0.1:8888/callback`, tick Web API, and copy the Client ID.
 2. Copy `config.example.json` to `config.json` and fill in the Client ID and your
    playlist URL or ID.
-3. Optional: `pip install -r requirements.txt` for the CLI chart (matplotlib) and the
+3. Optional: `pip install -r local-requirements.txt` for the CLI chart (matplotlib) and the
    audio estimator (librosa, scikit-learn, soundfile). The editor itself needs nothing.
 
 ## Web editor
