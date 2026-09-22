@@ -10,7 +10,7 @@ Paste any Spotify playlist or album link into the box at the top and it loads.
 
 Two ways to use it:
 
-- **Web editor** (`server.py` + `index.html`). One panel per feature, each with a
+- **Web editor** (`local_server.py` + `index.html`). One panel per feature, each with a
   draggable target curve. Every drag re-solves the track order live.
 - **CLI** (`spotify_sine.py`). Valence-only sine wave, produces CSVs and a chart.
 
@@ -51,7 +51,7 @@ You need Python 3.10+ and a free Spotify developer app.
 ## Web editor
 
 ```
-python3 server.py
+python3 local_server.py
 ```
 
 Opens <http://127.0.0.1:8765>. The first run pops a browser tab to log into Spotify;
@@ -81,7 +81,7 @@ from cache with no network.
 ## Hosting it
 
 `index.html` also works without the Python server. Push the repo to Vercel as a static
-site; `vercel.json` and `.vercelignore` keep Vercel from treating `server.py` as a
+site; `vercel.json` and `.vercelignore` keep Vercel from treating `local_server.py` as a
 serverless function.
 
 **Reading playlists needs no login.** `api/tracks.js` is a small Vercel function that
@@ -109,7 +109,7 @@ data are listed under Unplaced.
 | File | Purpose |
 |---|---|
 | `index.html` | the editor, vanilla JS and SVG, no build step; works with the local server or standalone |
-| `server.py` | serves the page, the cached data, and the create endpoint |
+| `local_server.py` | serves the page, the cached data, and the create endpoint |
 | `spotify_sine.py` | Spotify auth, fetch, ReccoBeats lookup, CLI planner, chart |
 | `estimate_features.py` | predicts features from preview audio for tracks with none |
 | `api/tracks.js` | Vercel function: reads public playlists/albums with app credentials, no user login |
