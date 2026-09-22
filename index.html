@@ -66,6 +66,7 @@
   table.list th { color: var(--muted); font-weight: 500; font-size: 12px; } table.list td.n { text-align: right; color: var(--ink2); }
   .est { color: var(--muted); font-weight: 400; font-size: 11px; }
   footer { padding: 16px 20px 28px; color: var(--muted); font-size: 12px; } footer a { color: var(--ink2); }
+  footer code { color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; user-select: all; }
   #msg { color: var(--ink2); font-size: 13px; } #msg a { color: var(--ink); }
 </style>
 </head>
@@ -99,6 +100,7 @@
   <details><summary id="unplacedSummary">Unplaced tracks</summary><div id="unplaced"></div></details>
 </main>
 <footer>
+  <div id="redirectNote" hidden style="margin-bottom:8px"></div>
   Track data from <a href="https://open.spotify.com" target="_blank" rel="noopener">Spotify</a> and
   <a href="https://reccobeats.com" target="_blank" rel="noopener">ReccoBeats</a>.
   Playlists are created privately on your own account. Nothing is stored anywhere but your browser.
@@ -425,6 +427,9 @@ async function renderAuth() {
   if (MODE === 'local') { b.hidden = true; return; }
   const tok = await getToken(); b.hidden = false;
   b.textContent = tok ? 'Log out' : 'Log in with Spotify'; b.onclick = tok ? logout : login;
+  b.title = tok ? '' : `Redirect URI this page uses: ${redirectUri()} (must be listed in the Spotify app's settings)`;
+  $('#redirectNote').hidden = !!tok;
+  $('#redirectNote').innerHTML = `Login redirect URI for this page, add it in the Spotify app's settings: <code>${redirectUri()}</code>`;
 }
 
 // --- Spotify Web API from the browser ---
