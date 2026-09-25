@@ -14,6 +14,16 @@
   .vbg-custom-page [hidden] { display: none !important; }
   /* Full-width editor: the charts want every pixel, so drop the shell's fixed content width. */
   .vbg-custom-page { width: calc(100% - 48px); max-width: none; }
+  /* One fixed color per feature, used wherever that feature appears: row, chart, tooltip. */
+  .vbg-custom-page {
+    --pc-valence: light-dark(#2a78d6, #3987e5); --pc-tempo: light-dark(#eb6834, #d95926);
+    --pc-energy: light-dark(#1baf7a, #199e70); --pc-danceability: light-dark(#d99400, #c98500);
+    --pc-acousticness: light-dark(#e87ba4, #d55181); --pc-instrumentalness: light-dark(#008300, #2f9a2f);
+    --pc-loudness: light-dark(#4a3aa7, #9085e9); --pc-speechiness: light-dark(#e34948, #e66767);
+  }
+  .vbg-custom-swatch { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 2px; background: var(--pc-color); vertical-align: middle; }
+  .vbg-custom-feature[data-off] .vbg-custom-swatch { background: transparent; box-shadow: inset 0 0 0 1.5px var(--pc-color); }
+  .vbg-custom-chart-title { display: flex; align-items: center; gap: var(--vbg-space-2); }
   .vbg-custom-main { display: grid; gap: var(--vbg-space-12); }
   .vbg-custom-main > * { min-width: 0; }
 
@@ -43,9 +53,10 @@
   .vbg-custom-playlists label { display: inline-flex; align-items: center; gap: var(--vbg-space-2); color: var(--vbg-text-primary); font-size: var(--vbg-type-compact); line-height: var(--vbg-leading-compact); }
   .vbg-custom-panels { display: grid; gap: var(--vbg-space-8); }
   .vbg-custom-panels svg { display: block; width: 100%; height: 210px; touch-action: none; }
-  .vbg-viz-track { fill: var(--vbg-text-primary); }
-  .vbg-viz-track-path { fill: none; stroke: var(--vbg-border-strong); stroke-width: 1; vector-effect: non-scaling-stroke; }
-  .vbg-viz-handle { cursor: ns-resize; }
+  .vbg-viz-track { fill: var(--pc-color); }
+  .vbg-viz-track-path { fill: none; stroke: var(--pc-color); stroke-width: 1; opacity: .45; vector-effect: non-scaling-stroke; }
+  .vbg-viz-target { stroke: var(--pc-color); stroke-width: 2.5; }
+  .vbg-viz-handle { stroke: var(--pc-color); cursor: ns-resize; }
   .vbg-viz-handle:hover, .vbg-viz-handle[data-active] { stroke-width: 3; }
   .vbg-viz-hit { fill: transparent; cursor: ns-resize; }
 
@@ -55,6 +66,7 @@
   .vbg-custom-tip td { padding: 0 var(--vbg-space-4) 0 0; color: var(--vbg-text-secondary); vertical-align: baseline; }
   .vbg-custom-tip td:last-child { padding-right: 0; }
   .vbg-custom-tip td.vbg-numeric { color: var(--vbg-text-primary); }
+  .vbg-custom-tip td .vbg-custom-swatch { margin-right: var(--vbg-space-2); }
 
   .vbg-custom-tables details + details { margin-block-start: var(--vbg-space-8); }
   .vbg-custom-tables details > .vbg-table-wrap { margin-block-start: var(--vbg-space-4); }
@@ -277,12 +289,13 @@ let solveTimer = null;
 function renderChips() {
   const box = $('#chips'); box.innerHTML = '';
   for (const f of FEATURES) {
-    const row = document.createElement('div'); row.className = 'vbg-custom-feature';
-    row.innerHTML = `<label class="vbg-custom-feature-name"><input type="checkbox" ${f.enabled ? 'checked' : ''}> ${f.label}</label>
+    const row = document.createElement('div'); row.className = 'vbg-custom-feature'; row.style.setProperty('--pc-color', `var(--pc-${f.key})`);
+    if (!f.enabled) row.dataset.off = '';
+    row.innerHTML = `<label class="vbg-custom-feature-name"><input type="checkbox" ${f.enabled ? 'checked' : ''}> <span class="vbg-custom-swatch" aria-hidden="true"></span>${f.label}</label>
       <input type="range" min="0" max="3" step="0.25" value="${f.weight}" aria-label="${f.label} weight" title="Weight: how much ${f.label.toLowerCase()} counts when several features are on" ${f.enabled ? '' : 'disabled'}>
       <select aria-label="${f.label} starting shape" title="Starting shape for the ${f.label.toLowerCase()} curve" ${f.enabled ? '' : 'disabled'}>${Object.entries(PRESETS).map(([k, p]) => `<option value="${k}" ${f.preset === k ? 'selected' : ''}>${p.label}</option>`).join('')}${f.preset === 'custom' ? '<option value="custom" selected>Custom curve</option>' : ''}</select>`;
     const cb = row.querySelector('input[type=checkbox]'), rg = row.querySelector('input[type=range]'), sel = row.querySelector('select');
-    cb.onchange = () => { f.enabled = cb.checked; rg.disabled = sel.disabled = !f.enabled; rebuild(); };
+    cb.onchange = () => { f.enabled = cb.checked; rg.disabled = sel.disabled = !f.enabled; row.toggleAttribute('data-off', !f.enabled); rebuild(); };
     rg.oninput = () => { f.weight = +rg.value; scheduleSolve(0); };
     sel.onchange = () => { if (sel.value !== 'custom') { applyPreset(f, sel.value); rebuild(); } };
     box.appendChild(row);
@@ -309,8 +322,8 @@ function missText(f) {
 function renderPanels() {
   const box = $('#panels'); box.innerHTML = '';
   for (const f of FEATURES.filter(f => f.enabled)) {
-    const fig = document.createElement('figure'); fig.className = 'vbg-chart'; fig.dataset.key = f.key;
-    fig.innerHTML = `<div class="vbg-chart-header"><h2 class="vbg-heading-16" id="h-${f.key}">${f.label}</h2><p class="vbg-meta vbg-custom-miss">${missText(f)}</p></div>
+    const fig = document.createElement('figure'); fig.className = 'vbg-chart'; fig.dataset.key = f.key; fig.style.setProperty('--pc-color', `var(--pc-${f.key})`);
+    fig.innerHTML = `<div class="vbg-chart-header"><h2 class="vbg-heading-16 vbg-custom-chart-title" id="h-${f.key}"><span class="vbg-custom-swatch" aria-hidden="true"></span>${f.label}</h2><p class="vbg-meta vbg-custom-miss">${missText(f)}</p></div>
       <div class="vbg-chart-viewport" tabindex="0" aria-labelledby="h-${f.key}"></div>`;
     const svg = el('svg', { viewBox: '0 0 900 210', role: 'img', 'aria-label': `${f.label} over time: target curve and placed tracks` });
     fig.querySelector('.vbg-chart-viewport').appendChild(svg);
@@ -345,12 +358,12 @@ function drawPanel(svg, f) {
   // target curve
   const g = interp(f.points), steps = 120;
   const d = Array.from({ length: steps + 1 }, (_, i) => { const t = i / steps; return `${X(t * T).toFixed(1)},${Y(g(t)).toFixed(1)}`; });
-  el('path', { class: 'vbg-series-stroke vbg-series-1', d: 'M' + d.join('L') }, svg);
+  el('path', { class: 'vbg-series-stroke vbg-viz-target', d: 'M' + d.join('L') }, svg);
   // handles
   f.points.forEach((u, i) => {
     const cx = X(i / (NPOINTS - 1) * T), cy = Y(u);
     const hit = el('rect', { class: 'vbg-viz-hit', x: cx - 14, y: y0 - 6, width: 28, height: y1 - y0 + 12 }, svg);
-    const h = el('circle', { class: 'vbg-data-point vbg-series-1 vbg-viz-handle', cx, cy, r: 6.5 }, svg);
+    const h = el('circle', { class: 'vbg-data-point vbg-viz-handle', cx, cy, r: 6.5 }, svg);
     const start = ev => {
       ev.preventDefault(); h.setAttribute('data-active', ''); hideTip();
       const move = e => {
@@ -379,7 +392,7 @@ function drawPanel(svg, f) {
 
 function showTip(e, o) {
   const tip = $('#tip'); tip.hidden = false;
-  const rows = FEATURES.filter(f => f.enabled).map(f => `<tr><td>${f.label}</td><td class="vbg-numeric">${fmt(f, o.features[f.key])}</td><td>target ${fmt(f, o.target[f.key])}</td></tr>`).join('');
+  const rows = FEATURES.filter(f => f.enabled).map(f => `<tr><td><span class="vbg-custom-swatch" style="--pc-color: var(--pc-${f.key})" aria-hidden="true"></span>${f.label}</td><td class="vbg-numeric">${fmt(f, o.features[f.key])}</td><td>target ${fmt(f, o.target[f.key])}</td></tr>`).join('');
   tip.innerHTML = `<div><strong>${esc(o.title)}</strong>${o.estimated ? ' <span class="vbg-custom-tip-artist">(estimated from audio)</span>' : ''}</div><div class="vbg-custom-tip-artist">${esc(o.artist)}, starts ${hhmm(o.start)}</div><table>${rows}</table>`;
   const x = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 10);
   tip.style.left = x + 'px'; tip.style.top = (e.clientY + 14) + 'px';

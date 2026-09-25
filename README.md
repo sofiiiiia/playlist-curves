@@ -59,8 +59,9 @@ the token is saved to `token.json` and refreshed automatically afterwards.
 
 The page is built on Vercel's Geist design foundation. `assets/vercel-brand.css` is the
 published stylesheet, loaded unchanged, with Geist from Google Fonts; everything
-page-specific (control lanes, chart marks, tooltip) is a handful of `vbg-custom-*` and
-`vbg-viz-*` rules at the top of `index.html`. Light and dark follow the system setting.
+page-specific (control lanes, chart marks, tooltip, the one fixed color per feature) is a
+handful of `vbg-custom-*` and `vbg-viz-*` rules at the top of `index.html`. Light and dark
+follow the system setting.
 
 - Tick a feature chip to add its panel. Drag the handles to shape the curve, or pick a
   preset (sine, two cycles, hill, valley, rise, fall, flat).
