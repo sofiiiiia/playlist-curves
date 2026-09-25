@@ -12,6 +12,8 @@
 <style>
   /* Page-owned layout. Only vbg-custom-* / vbg-viz-* selectors, only public tokens. */
   .vbg-custom-page [hidden] { display: none !important; }
+  /* Full-width editor: the charts want every pixel, so drop the shell's fixed content width. */
+  .vbg-custom-page { width: calc(100% - 48px); max-width: none; }
   .vbg-custom-main { display: grid; gap: var(--vbg-space-12); }
   .vbg-custom-main > * { min-width: 0; }
 
@@ -24,8 +26,8 @@
   .vbg-custom-controls fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
   .vbg-custom-controls legend { padding: 0; margin-block-end: var(--vbg-space-3); }
   .vbg-custom-length-fields { display: grid; grid-template-columns: repeat(2, 112px); gap: var(--vbg-space-4); }
-  .vbg-custom-feature-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--vbg-space-2) var(--vbg-space-8); }
-  .vbg-custom-feature { display: grid; grid-template-columns: minmax(0, 1fr) 88px 172px; gap: var(--vbg-space-3); align-items: center; min-height: 36px; }
+  .vbg-custom-feature-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: var(--vbg-space-2) var(--vbg-space-8); }
+  .vbg-custom-feature { display: grid; grid-template-columns: minmax(150px, 1fr) 88px 172px; gap: var(--vbg-space-3); align-items: center; min-height: 36px; }
   .vbg-custom-feature-name { display: flex; align-items: center; gap: var(--vbg-space-2); min-width: 0; color: var(--vbg-text-primary); font-size: var(--vbg-type-compact); line-height: var(--vbg-leading-compact); }
   .vbg-custom-feature-name input { flex: none; }
   .vbg-custom-feature input[type="range"], .vbg-custom-feature select { min-width: 0; width: 100%; }
