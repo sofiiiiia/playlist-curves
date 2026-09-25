@@ -33,8 +33,12 @@ Two ways to use it:
    slots, and every slot has a target value per enabled feature read off your curve.
 4. Solves the slot-to-track assignment exactly (Hungarian algorithm in the browser,
    a sorted-matching dynamic program in the CLI), minimizing the weighted distance
-   between each track's features and its slot's targets. Slot times are then refined
-   from real track durations and the solve is repeated.
+   between each track's features and its slot's targets. Each feature's distance is
+   scaled by that feature's spread in the loaded playlist (5th to 95th percentile), so
+   weight 1 pulls equally hard whether the feature is valence or loudness. Slot times are
+   then refined from real track durations and the solve is repeated. A Flat curve is a
+   real target, not "ignore": it holds the middle value, and the chart caption states how
+   much scatter around it is unavoidable.
 5. Exports.
 
 ## Setup
