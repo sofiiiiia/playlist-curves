@@ -120,7 +120,7 @@ def fetch_tracks(token, kind, item_id):
     H = {"Authorization": "Bearer " + token}
     tracks = []
     if kind == "playlist":
-        meta = http(f"https://api.spotify.com/v1/playlists/{item_id}?fields=name,images", headers=H)
+        meta = http(f"https://api.spotify.com/v1/playlists/{item_id}?fields=name,images,description,owner(display_name)", headers=H)
         url = (f"https://api.spotify.com/v1/playlists/{item_id}/items?limit=100"
                "&fields=next,items(item(id,uri,name,duration_ms,artists(name)))")
         while url:
@@ -146,7 +146,10 @@ def fetch_tracks(token, kind, item_id):
     print(f"fetched {len(tracks)} tracks from {kind} '{meta['name']}' "
           f"({sum(t['duration'] for t in tracks)/3.6e6:.2f} h)")
     image = (meta.get("images") or [{}])[0].get("url")
-    return {"name": meta["name"], "image": image, "kind": kind, "id": item_id, "tracks": tracks}
+    owner = (meta.get("owner") or {}).get("display_name") or ", ".join(a["name"] for a in meta.get("artists", []))
+    description = meta.get("description") or (f"Released {meta['release_date']}" if meta.get("release_date") else "")
+    return {"name": meta["name"], "image": image, "owner": owner, "description": description,
+            "kind": kind, "id": item_id, "tracks": tracks}
 
 
 def fetch_playlist(token, playlist_id):

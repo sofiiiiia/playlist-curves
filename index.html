@@ -16,9 +16,15 @@
   .vbg-custom-page { width: calc(100% - 2 * clamp(24px, 3vw, 56px)); max-width: none; padding-block-start: var(--vbg-space-6); }
   /* Cover art: top right, under the masthead's login line, level with the title. The header's
      third row soaks up the cover's extra height so the title and summary stay together. */
-  .vbg-custom-page > .vbg-header:has(> .vbg-custom-cover:not([hidden])) { grid-template-rows: auto auto minmax(0, 1fr); }
-  .vbg-custom-cover { grid-column: 9 / -1; grid-row: 2 / span 2; justify-self: end; align-self: start; width: clamp(200px, 22vw, 320px); aspect-ratio: 1; object-fit: cover; border-radius: var(--vbg-radius-small); margin-block-start: clamp(32px, 4vw, 48px); }
-  @media (max-width: 760px) { .vbg-custom-cover { grid-column: 1 / -1; grid-row: auto; justify-self: start; width: 112px; margin-block-start: var(--vbg-space-4); } }
+  .vbg-custom-page > .vbg-header:has(> .vbg-custom-cover:not([hidden])) { grid-template-rows: auto auto auto auto auto minmax(0, 1fr); }
+  .vbg-custom-cover { grid-column: 9 / -1; grid-row: 2 / span 5; justify-self: end; align-self: start; width: clamp(200px, 22vw, 320px); aspect-ratio: 1; object-fit: cover; border-radius: var(--vbg-radius-small); margin-block-start: clamp(32px, 4vw, 48px); }
+  .vbg-custom-desc { grid-column: 1 / span 7; margin-block-start: var(--vbg-space-2); color: var(--vbg-text-secondary); font-size: var(--vbg-type-body); line-height: var(--vbg-leading-body); }
+  .vbg-custom-desc strong { color: var(--vbg-text-primary); font-weight: var(--vbg-weight-medium); }
+  .vbg-custom-source { grid-column: 1 / span 8; margin-block-start: var(--vbg-space-8); }
+  @media (max-width: 760px) {
+    .vbg-custom-cover { grid-column: 1 / -1; grid-row: auto; justify-self: start; width: 112px; margin-block-start: var(--vbg-space-4); }
+    .vbg-custom-desc, .vbg-custom-source { grid-column: 1 / -1; }
+  }
   /* One fixed color per feature, used wherever that feature appears: row, chart, tooltip. */
   .vbg-custom-page {
     --pc-valence: light-dark(#2a78d6, #3987e5); --pc-tempo: light-dark(#eb6834, #d95926);
@@ -96,11 +102,8 @@
     </div>
     <h1 class="vbg-title" id="title">Reorder a playlist so its mood follows a curve</h1>
     <p class="vbg-lede" id="subtitle">Paste a Spotify playlist or album link. Draw a shape for valence, tempo or energy over time and the tracks are reordered to follow it. Export the result as CSV, as URIs, or as new playlists on your account.</p>
-    <img class="vbg-custom-cover" id="cover" alt="" hidden>
-  </header>
-
-  <main id="main" class="vbg-custom-main">
-    <section class="vbg-stack" data-gap="tight" aria-label="Source">
+    <p class="vbg-custom-desc" id="desc" hidden></p>
+    <section class="vbg-stack vbg-custom-source" data-gap="tight" aria-label="Source">
       <form class="vbg-custom-load" id="loadForm" novalidate>
         <div class="vbg-field">
           <label class="vbg-label" for="link">Spotify playlist or album link</label>
@@ -113,7 +116,10 @@
       </form>
       <p class="vbg-caption" id="msg" role="status" aria-live="polite"></p>
     </section>
+    <img class="vbg-custom-cover" id="cover" alt="" hidden onerror="if (this.src !== data.image) this.src = data.image;">
+  </header>
 
+  <main id="main" class="vbg-custom-main">
     <section class="vbg-stack vbg-custom-tool" data-gap="group" id="tool" aria-label="Curve editor" hidden>
       <div class="vbg-custom-controls">
         <fieldset>
@@ -210,6 +216,9 @@ const norm = (f, v) => (v - f.min) / (f.max - f.min);
 const denorm = (f, u) => f.min + u * (f.max - f.min);
 const fmt = (f, v) => f.key === 'tempo' ? Math.round(v) + f.unit : f.key === 'loudness' ? v.toFixed(1) + f.unit : v.toFixed(2);
 const hhmm = ms => { const m = Math.floor(ms / 60000); return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`; };
+// Spotify's API hands back the 300 px cover for playlists. The CDN keeps a 640 px copy under a
+// different size code, and mosaics under /640/, so ask for those and fall back if they 404.
+const hiRes = url => url.replace(/ab67706c0000(da84|d72c)/, 'ab67706c0000bebb').replace(/ab67616d0000(1e02|4851)/, 'ab67616d0000b273').replace(/mosaic\.scdn\.co\/(300|60)\//, 'mosaic.scdn.co/640/');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- state ----------
@@ -445,8 +454,8 @@ function renderList() {
   const anyEst = o.some(t => t.estimated);
   $('#list').innerHTML = `<div class="vbg-table-wrap"><table>
     <caption class="vbg-visually-hidden">Tracks of playlist ${selected + 1} in playing order, with the audio feature values used to place them</caption>
-    <thead><tr><th scope="col" class="vbg-numeric">Start</th><th scope="col">Title</th><th scope="col">Artist</th>${active.map(f => `<th scope="col" class="vbg-numeric">${f.label}</th>`).join('')}</tr></thead>
-    <tbody>${o.map(t => `<tr><td class="vbg-numeric">${hhmm(t.start)}</td><td>${esc(t.title)}</td><td>${esc(t.artist)}</td>${active.map(f => `<td class="vbg-numeric">${t.estimated ? '≈ ' : ''}${fmt(f, t.features[f.key])}</td>`).join('')}</tr>`).join('')}</tbody>
+    <thead><tr><th scope="col">Title</th><th scope="col">Artist</th><th scope="col" class="vbg-numeric">Start</th>${active.map(f => `<th scope="col" class="vbg-numeric">${f.label}</th>`).join('')}</tr></thead>
+    <tbody>${o.map(t => `<tr><td>${esc(t.title)}</td><td>${esc(t.artist)}</td><td class="vbg-numeric">${hhmm(t.start)}</td>${active.map(f => `<td class="vbg-numeric">${t.estimated ? '≈ ' : ''}${fmt(f, t.features[f.key])}</td>`).join('')}</tr>`).join('')}</tbody>
     </table></div>` + (anyEst ? '<p class="vbg-caption">≈ marks values estimated from the track\'s audio preview. Valence estimates are typically within 0.15 of Spotify\'s figure.</p>' : '');
   const used = new Set(plans.flat().map(t => t.id));
   const left = pool.filter(t => !used.has(t.id));
@@ -564,17 +573,17 @@ function parseLink(link) {
 const rowOf = t => ({ id: t.id, uri: t.uri, title: t.name, artist: t.artists.map(a => a.name).join(', '), duration: t.duration_ms });
 async function fetchTracksDirect(link) {
   const { kind, id } = parseLink(link), tracks = [];
-  let name, image, url;
+  let name, image, owner, description, url;
   if (kind === 'playlist') {
-    const meta = await sp(`playlists/${id}?fields=name,images`); name = meta.name; image = (meta.images || [])[0]?.url;
+    const meta = await sp(`playlists/${id}?fields=name,images,description,owner(display_name)`); name = meta.name; image = (meta.images || [])[0]?.url; owner = meta.owner?.display_name; description = meta.description || '';
     url = `https://api.spotify.com/v1/playlists/${id}/items?limit=100&fields=next,items(item(id,uri,name,duration_ms,artists(name)))`;
     while (url) { const page = await sp(url); for (const it of page.items) if (it.item && it.item.id) tracks.push(rowOf(it.item)); url = page.next; }
   } else {
-    const meta = await sp(`albums/${id}`); name = meta.name; image = (meta.images || [])[0]?.url;
+    const meta = await sp(`albums/${id}`); name = meta.name; image = (meta.images || [])[0]?.url; owner = (meta.artists || []).map(a => a.name).join(', '); description = meta.release_date ? `Released ${meta.release_date}` : '';
     url = `https://api.spotify.com/v1/albums/${id}/tracks?limit=50`;
     while (url) { const page = await sp(url); for (const t of page.items) if (t && t.id) tracks.push(rowOf(t)); url = page.next; }
   }
-  return { name, image, kind, id, url: `https://open.spotify.com/${kind}/${id}`, tracks };
+  return { name, image, owner, description, kind, id, url: `https://open.spotify.com/${kind}/${id}`, tracks };
 }
 
 // --- ReccoBeats (mirror of Spotify's audio features) from the browser, cached in localStorage ---
@@ -687,7 +696,10 @@ async function load(refetch = false) {
     pool = data.tracks.filter(t => t.features); unplaced = data.tracks.filter(t => !t.features);
     const total = data.tracks.reduce((s, t) => s + t.duration, 0) / 3.6e6;
     $('#title').textContent = data.name;
-    const cover = $('#cover'); cover.hidden = !data.image; if (data.image) { cover.src = data.image; cover.alt = `Cover of ${data.name}`; }
+    const cover = $('#cover'); cover.hidden = !data.image; if (data.image) { cover.src = hiRes(data.image); cover.alt = `Cover of ${data.name}`; }
+    const desc = $('#desc'), descText = (data.description || '').replace(/<[^>]*>/g, '').trim();
+    desc.hidden = !(data.owner || descText);
+    desc.innerHTML = (data.owner ? `<strong>By ${esc(data.owner)}</strong>` : '') + (data.owner && descText ? '. ' : '') + esc(descText);
     $('#subtitle').innerHTML = `${data.tracks.length} tracks, ${total.toFixed(1)} hours, ${pool.length} with audio features. <a href="${data.url}" target="_blank" rel="noopener">Open in Spotify</a>.`;
     document.title = data.name + ', playlist curves';
     // default length: whole thing in one go, rounded to the half hour, unless the user set something
