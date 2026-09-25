@@ -24,6 +24,7 @@
   .vbg-custom-swatch { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 2px; background: var(--pc-color); vertical-align: middle; }
   .vbg-custom-feature[data-off] .vbg-custom-swatch { background: transparent; box-shadow: inset 0 0 0 1.5px var(--pc-color); }
   .vbg-custom-chart-title { display: flex; align-items: center; gap: var(--vbg-space-2); }
+  .vbg-custom-term { text-decoration: underline dotted; text-decoration-color: var(--vbg-border-default); text-decoration-thickness: 1px; text-underline-offset: 4px; cursor: help; }
   .vbg-custom-main { display: grid; gap: var(--vbg-space-12); }
   .vbg-custom-main > * { min-width: 0; }
 
@@ -168,14 +169,22 @@
 <script>
 // ---------- feature definitions ----------
 const FEATURES = [
-  { key: 'valence',          label: 'Valence',          min: 0,   max: 1,   unit: '',    enabled: true,  weight: 1 },
-  { key: 'tempo',            label: 'Tempo',            min: 60,  max: 220, unit: ' BPM', enabled: false, weight: 1 },
-  { key: 'energy',           label: 'Energy',           min: 0,   max: 1,   unit: '',    enabled: false, weight: 1 },
-  { key: 'danceability',     label: 'Danceability',     min: 0,   max: 1,   unit: '',    enabled: false, weight: 1 },
-  { key: 'acousticness',     label: 'Acousticness',     min: 0,   max: 1,   unit: '',    enabled: false, weight: 1 },
-  { key: 'instrumentalness', label: 'Instrumentalness', min: 0,   max: 1,   unit: '',    enabled: false, weight: 1 },
-  { key: 'loudness',         label: 'Loudness',         min: -20, max: -4,  unit: ' dB', enabled: false, weight: 1 },
-  { key: 'speechiness',      label: 'Speechiness',      min: 0,   max: 0.6, unit: '',    enabled: false, weight: 1 },
+  { key: 'valence',          label: 'Valence',          min: 0,   max: 1,   unit: '',    enabled: true,  weight: 1,
+    desc: 'How positive the track sounds, 0 to 1. High is happy, cheerful, euphoric. Low is sad, angry, tense.' },
+  { key: 'tempo',            label: 'Tempo',            min: 60,  max: 220, unit: ' BPM', enabled: false, weight: 1,
+    desc: 'Speed in beats per minute. A slow ballad sits near 70, most pop near 120, drum and bass near 170.' },
+  { key: 'energy',           label: 'Energy',           min: 0,   max: 1,   unit: '',    enabled: false, weight: 1,
+    desc: 'Intensity and activity, 0 to 1. Loud, fast, noisy tracks score high. Quiet, calm tracks score low.' },
+  { key: 'danceability',     label: 'Danceability',     min: 0,   max: 1,   unit: '',    enabled: false, weight: 1,
+    desc: 'How easy it is to dance to, 0 to 1, from the steadiness of the beat, rhythm and overall regularity.' },
+  { key: 'acousticness',     label: 'Acousticness',     min: 0,   max: 1,   unit: '',    enabled: false, weight: 1,
+    desc: 'Confidence that the track is acoustic rather than electronic or amplified, 0 to 1.' },
+  { key: 'instrumentalness', label: 'Instrumentalness', min: 0,   max: 1,   unit: '',    enabled: false, weight: 1,
+    desc: 'Likelihood the track has no vocals, 0 to 1. Above about 0.5 is probably instrumental.' },
+  { key: 'loudness',         label: 'Loudness',         min: -20, max: -4,  unit: ' dB', enabled: false, weight: 1,
+    desc: 'Average loudness of the whole track in decibels, typically between -20 (quiet) and -4 (very loud).' },
+  { key: 'speechiness',      label: 'Speechiness',      min: 0,   max: 0.6, unit: '',    enabled: false, weight: 1,
+    desc: 'How much of the track is spoken words, 0 to 1. Songs sit below 0.33, rap and talk radio above.' },
 ];
 const PRESETS = {
   sine:   { label: 'Sine: mid, peak, trough',    f: t => 0.5 + 0.5 * Math.sin(2 * Math.PI * t) },
@@ -293,7 +302,7 @@ function renderChips() {
   for (const f of FEATURES) {
     const row = document.createElement('div'); row.className = 'vbg-custom-feature'; row.style.setProperty('--pc-color', `var(--pc-${f.key})`);
     if (!f.enabled) row.dataset.off = '';
-    row.innerHTML = `<label class="vbg-custom-feature-name"><input type="checkbox" ${f.enabled ? 'checked' : ''}> <span class="vbg-custom-swatch" aria-hidden="true"></span>${f.label}</label>
+    row.innerHTML = `<label class="vbg-custom-feature-name"><input type="checkbox" ${f.enabled ? 'checked' : ''} aria-describedby="d-${f.key}"> <span class="vbg-custom-swatch" aria-hidden="true"></span><span class="vbg-custom-term" title="${esc(f.desc)}">${f.label}</span><span id="d-${f.key}" class="vbg-visually-hidden">${esc(f.desc)}</span></label>
       <input type="range" min="0" max="3" step="0.25" value="${f.weight}" aria-label="${f.label} weight" title="Weight: how much ${f.label.toLowerCase()} counts when several features are on" ${f.enabled ? '' : 'disabled'}>
       <select aria-label="${f.label} starting shape" title="Starting shape for the ${f.label.toLowerCase()} curve" ${f.enabled ? '' : 'disabled'}>${Object.entries(PRESETS).map(([k, p]) => `<option value="${k}" ${f.preset === k ? 'selected' : ''}>${p.label}</option>`).join('')}${f.preset === 'custom' ? '<option value="custom" selected>Custom curve</option>' : ''}</select>`;
     const cb = row.querySelector('input[type=checkbox]'), rg = row.querySelector('input[type=range]'), sel = row.querySelector('select');
@@ -325,7 +334,7 @@ function renderPanels() {
   const box = $('#panels'); box.innerHTML = '';
   for (const f of FEATURES.filter(f => f.enabled)) {
     const fig = document.createElement('figure'); fig.className = 'vbg-chart'; fig.dataset.key = f.key; fig.style.setProperty('--pc-color', `var(--pc-${f.key})`);
-    fig.innerHTML = `<div class="vbg-chart-header"><h2 class="vbg-heading-16 vbg-custom-chart-title" id="h-${f.key}"><span class="vbg-custom-swatch" aria-hidden="true"></span>${f.label}</h2><p class="vbg-meta vbg-custom-miss">${missText(f)}</p></div>
+    fig.innerHTML = `<div class="vbg-chart-header"><h2 class="vbg-heading-16 vbg-custom-chart-title" id="h-${f.key}"><span class="vbg-custom-swatch" aria-hidden="true"></span><span class="vbg-custom-term" title="${esc(f.desc)}">${f.label}</span></h2><p class="vbg-meta vbg-custom-miss">${missText(f)}</p></div>
       <div class="vbg-chart-viewport" tabindex="0" aria-labelledby="h-${f.key}"></div>`;
     const svg = el('svg', { viewBox: '0 0 900 210', role: 'img', 'aria-label': `${f.label} over time: target curve and placed tracks` });
     fig.querySelector('.vbg-chart-viewport').appendChild(svg);
