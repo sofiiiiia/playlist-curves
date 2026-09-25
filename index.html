@@ -13,7 +13,10 @@
   /* Page-owned layout. Only vbg-custom-* / vbg-viz-* selectors, only public tokens. */
   .vbg-custom-page [hidden] { display: none !important; }
   /* Full-width editor: the charts want every pixel, so drop the shell's fixed content width. */
-  .vbg-custom-page { width: calc(100% - 2 * clamp(24px, 3vw, 56px)); max-width: none; }
+  .vbg-custom-page { width: calc(100% - 2 * clamp(24px, 3vw, 56px)); max-width: none; padding-block-start: var(--vbg-space-6); }
+  /* Cover art: top right, under the masthead's login line, level with the title. */
+  .vbg-custom-cover { grid-column: 10 / -1; grid-row: 2 / span 2; justify-self: end; align-self: start; width: clamp(112px, 12vw, 192px); aspect-ratio: 1; object-fit: cover; border-radius: var(--vbg-radius-small); margin-block-start: clamp(32px, 4vw, 48px); }
+  @media (max-width: 760px) { .vbg-custom-cover { grid-column: 1 / -1; grid-row: auto; justify-self: start; width: 112px; margin-block-start: var(--vbg-space-4); } }
   /* One fixed color per feature, used wherever that feature appears: row, chart, tooltip. */
   .vbg-custom-page {
     --pc-valence: light-dark(#2a78d6, #3987e5); --pc-tempo: light-dark(#eb6834, #d95926);
@@ -47,7 +50,8 @@
   @media (max-width: 760px) {
     .vbg-custom-controls { grid-template-columns: minmax(0, 1fr); }
     .vbg-custom-feature-list { grid-template-columns: minmax(0, 1fr); }
-    .vbg-custom-feature { grid-template-columns: minmax(0, 1fr) 64px minmax(0, 132px); }
+    .vbg-custom-feature { grid-template-columns: minmax(0, 1fr) 52px 104px; gap: var(--vbg-space-2); }
+    .vbg-custom-feature select { padding-inline: var(--vbg-space-2); }
   }
 
   .vbg-custom-playlists { display: flex; flex-wrap: wrap; align-items: center; gap: var(--vbg-space-3) var(--vbg-space-6); }
@@ -55,11 +59,12 @@
   .vbg-custom-playlists label { display: inline-flex; align-items: center; gap: var(--vbg-space-2); color: var(--vbg-text-primary); font-size: var(--vbg-type-compact); line-height: var(--vbg-leading-compact); }
   .vbg-custom-panels { display: grid; gap: var(--vbg-space-8); }
   .vbg-custom-panels svg { display: block; width: 100%; height: 210px; touch-action: none; }
-  .vbg-viz-track { fill: var(--pc-color); }
-  .vbg-viz-track-path { fill: none; stroke: var(--pc-color); stroke-width: 1; opacity: .45; vector-effect: non-scaling-stroke; }
-  .vbg-viz-target { stroke: var(--pc-color); stroke-width: 2.5; }
-  .vbg-viz-handle { stroke: var(--pc-color); cursor: ns-resize; }
-  .vbg-viz-handle:hover, .vbg-viz-handle[data-active] { stroke-width: 3; }
+  .vbg-viz-track { fill: var(--pc-color); pointer-events: none; }
+  .vbg-viz-track-path { fill: none; stroke: var(--pc-color); stroke-width: 1; opacity: .45; vector-effect: non-scaling-stroke; pointer-events: none; }
+  .vbg-viz-target { stroke: var(--pc-color); stroke-width: 2.5; pointer-events: none; }
+  .vbg-viz-cross { pointer-events: none; }
+  .vbg-viz-handle { stroke: var(--pc-color); stroke-width: 2.5; cursor: ns-resize; }
+  .vbg-viz-handle:hover, .vbg-viz-handle[data-active] { stroke-width: 4; }
   .vbg-viz-hit { fill: transparent; cursor: ns-resize; }
 
   .vbg-custom-tip { position: fixed; z-index: 5; max-width: 320px; padding: var(--vbg-space-3); background: var(--vbg-surface-primary); color: var(--vbg-text-primary); border: 1px solid var(--vbg-border-default); border-radius: var(--vbg-radius-small); font-size: var(--vbg-type-compact); line-height: var(--vbg-leading-compact); pointer-events: none; }
@@ -89,6 +94,7 @@
     </div>
     <h1 class="vbg-title" id="title">Reorder a playlist so its mood follows a curve</h1>
     <p class="vbg-lede" id="subtitle">Paste a Spotify playlist or album link. Draw a shape for valence, tempo or energy over time and the tracks are reordered to follow it. Export the result as CSV, as URIs, or as new playlists on your account.</p>
+    <img class="vbg-custom-cover" id="cover" alt="" hidden>
   </header>
 
   <main id="main" class="vbg-custom-main">
@@ -374,8 +380,8 @@ function drawPanel(svg, f) {
   // handles
   f.points.forEach((u, i) => {
     const cx = X(i / (NPOINTS - 1) * T), cy = Y(u);
-    const hit = el('rect', { class: 'vbg-viz-hit', x: cx - 14, y: y0 - 6, width: 28, height: y1 - y0 + 12 }, svg);
-    const h = el('circle', { class: 'vbg-data-point vbg-viz-handle', cx, cy, r: 6.5 }, svg);
+    const hit = el('rect', { class: 'vbg-viz-hit', x: cx - 18, y: y0 - 8, width: 36, height: y1 - y0 + 16 }, svg);
+    const h = el('circle', { class: 'vbg-data-point vbg-viz-handle', cx, cy, r: 8 }, svg);
     const start = ev => {
       ev.preventDefault(); h.setAttribute('data-active', ''); hideTip();
       const move = e => {
@@ -556,17 +562,17 @@ function parseLink(link) {
 const rowOf = t => ({ id: t.id, uri: t.uri, title: t.name, artist: t.artists.map(a => a.name).join(', '), duration: t.duration_ms });
 async function fetchTracksDirect(link) {
   const { kind, id } = parseLink(link), tracks = [];
-  let name, url;
+  let name, image, url;
   if (kind === 'playlist') {
-    name = (await sp(`playlists/${id}?fields=name`)).name;
+    const meta = await sp(`playlists/${id}?fields=name,images`); name = meta.name; image = (meta.images || [])[0]?.url;
     url = `https://api.spotify.com/v1/playlists/${id}/items?limit=100&fields=next,items(item(id,uri,name,duration_ms,artists(name)))`;
     while (url) { const page = await sp(url); for (const it of page.items) if (it.item && it.item.id) tracks.push(rowOf(it.item)); url = page.next; }
   } else {
-    name = (await sp(`albums/${id}`)).name;
+    const meta = await sp(`albums/${id}`); name = meta.name; image = (meta.images || [])[0]?.url;
     url = `https://api.spotify.com/v1/albums/${id}/tracks?limit=50`;
     while (url) { const page = await sp(url); for (const t of page.items) if (t && t.id) tracks.push(rowOf(t)); url = page.next; }
   }
-  return { name, kind, id, url: `https://open.spotify.com/${kind}/${id}`, tracks };
+  return { name, image, kind, id, url: `https://open.spotify.com/${kind}/${id}`, tracks };
 }
 
 // --- ReccoBeats (mirror of Spotify's audio features) from the browser, cached in localStorage ---
@@ -679,6 +685,7 @@ async function load(refetch = false) {
     pool = data.tracks.filter(t => t.features); unplaced = data.tracks.filter(t => !t.features);
     const total = data.tracks.reduce((s, t) => s + t.duration, 0) / 3.6e6;
     $('#title').textContent = data.name;
+    const cover = $('#cover'); cover.hidden = !data.image; if (data.image) { cover.src = data.image; cover.alt = `Cover of ${data.name}`; }
     $('#subtitle').innerHTML = `${data.tracks.length} tracks, ${total.toFixed(1)} hours, ${pool.length} with audio features. <a href="${data.url}" target="_blank" rel="noopener">Open in Spotify</a>.`;
     document.title = data.name + ', playlist curves';
     // default length: whole thing in one go, rounded to the half hour, unless the user set something

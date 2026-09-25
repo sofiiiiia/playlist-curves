@@ -19,7 +19,7 @@ CACHE = os.path.join(HERE, "cache"); os.makedirs(CACHE, exist_ok=True)
 def load_data(link, refetch=False):
     kind, item_id = ss.parse_link(link or CFG.get("playlist_id", ""))
     cache_f = os.path.join(CACHE, f"{kind}_{item_id}.json")
-    if refetch or not os.path.exists(cache_f):
+    if refetch or not os.path.exists(cache_f) or "image" not in json.load(open(cache_f)):  # older caches lack the cover
         tok = ss.auth(CFG["client_id"])
         d = ss.fetch_tracks(tok, kind, item_id)
         json.dump(d, open(cache_f, "w"))

@@ -41,17 +41,17 @@ module.exports = async (req, res) => {
     if (!link) return res.status(400).json({ error: 'missing link' });
     const { kind, id } = parseLink(link);
     const token = await appToken(), tracks = [];
-    let name, url;
+    let name, image, url;
     if (kind === 'playlist') {
-      name = (await sp(`https://api.spotify.com/v1/playlists/${id}?fields=name`, token)).name;
+      const meta = await sp(`https://api.spotify.com/v1/playlists/${id}?fields=name,images`, token); name = meta.name; image = (meta.images || [])[0]?.url;
       url = `https://api.spotify.com/v1/playlists/${id}/items?limit=100&fields=next,items(item(id,uri,name,duration_ms,artists(name)))`;
       while (url) { const page = await sp(url, token); for (const it of page.items) if (it.item && it.item.id) tracks.push(rowOf(it.item)); url = page.next; }
     } else {
-      name = (await sp(`https://api.spotify.com/v1/albums/${id}`, token)).name;
+      const meta = await sp(`https://api.spotify.com/v1/albums/${id}`, token); name = meta.name; image = (meta.images || [])[0]?.url;
       url = `https://api.spotify.com/v1/albums/${id}/tracks?limit=50`;
       while (url) { const page = await sp(url, token); for (const t of page.items) if (t && t.id) tracks.push(rowOf(t)); url = page.next; }
     }
-    res.status(200).json({ name, kind, id, url: `https://open.spotify.com/${kind}/${id}`, tracks });
+    res.status(200).json({ name, image, kind, id, url: `https://open.spotify.com/${kind}/${id}`, tracks });
   } catch (e) {
     const status = e.status === 404 ? 404 : 400;
     res.status(status).json({ error: e.status === 404 ? 'Not found. Is the playlist public?' : e.message });
