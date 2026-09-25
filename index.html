@@ -2,113 +2,155 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Playlist curve editor</title>
+<title>Playlist curves</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..600&family=Geist+Mono:wght@400..600&display=swap" rel="stylesheet" referrerpolicy="no-referrer">
+<link href="assets/vercel-brand.css" rel="stylesheet">
 <style>
-  :root {
-    color-scheme: light dark;
-    --surface: #fcfcfb; --page: #f9f9f7; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
-    --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10); --ok: #006300;
-    --c-valence: #2a78d6; --c-tempo: #eb6834; --c-energy: #1baf7a; --c-danceability: #eda100;
-    --c-acousticness: #e87ba4; --c-instrumentalness: #008300; --c-loudness: #4a3aa7; --c-speechiness: #e34948;
+  /* Page-owned layout. Only vbg-custom-* / vbg-viz-* selectors, only public tokens. */
+  .vbg-custom-page [hidden] { display: none !important; }
+  .vbg-custom-main { display: grid; gap: var(--vbg-space-12); }
+  .vbg-custom-main > * { min-width: 0; }
+
+  .vbg-custom-load { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--vbg-space-3); align-items: end; max-width: 760px; }
+  .vbg-custom-load .vbg-field { min-width: 0; }
+  .vbg-custom-load-actions { display: flex; flex-wrap: wrap; gap: var(--vbg-space-3); }
+  @media (max-width: 560px) { .vbg-custom-load { grid-template-columns: minmax(0, 1fr); } }
+
+  .vbg-custom-controls { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--vbg-space-6) var(--vbg-space-10); align-items: start; }
+  .vbg-custom-controls fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+  .vbg-custom-controls legend { padding: 0; margin-block-end: var(--vbg-space-3); }
+  .vbg-custom-length-fields { display: grid; grid-template-columns: repeat(2, 112px); gap: var(--vbg-space-4); }
+  .vbg-custom-feature-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--vbg-space-2) var(--vbg-space-8); }
+  .vbg-custom-feature { display: grid; grid-template-columns: minmax(0, 1fr) 88px 172px; gap: var(--vbg-space-3); align-items: center; min-height: 36px; }
+  .vbg-custom-feature-name { display: flex; align-items: center; gap: var(--vbg-space-2); min-width: 0; color: var(--vbg-text-primary); font-size: var(--vbg-type-compact); line-height: var(--vbg-leading-compact); }
+  .vbg-custom-feature-name input { flex: none; }
+  .vbg-custom-feature input[type="range"], .vbg-custom-feature select { min-width: 0; width: 100%; }
+  .vbg-custom-feature select { font-size: var(--vbg-type-label); }
+  @media (max-width: 760px) {
+    .vbg-custom-controls { grid-template-columns: minmax(0, 1fr); }
+    .vbg-custom-feature-list { grid-template-columns: minmax(0, 1fr); }
+    .vbg-custom-feature { grid-template-columns: minmax(0, 1fr) 64px minmax(0, 132px); }
   }
-  @media (prefers-color-scheme: dark) { :root {
-    --surface: #1a1a19; --page: #0d0d0d; --ink: #fff; --ink2: #c3c2b7; --muted: #898781;
-    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --ok: #0ca30c;
-    --c-valence: #3987e5; --c-tempo: #d95926; --c-energy: #199e70; --c-danceability: #c98500;
-    --c-acousticness: #d55181; --c-instrumentalness: #008300; --c-loudness: #9085e9; --c-speechiness: #e66767;
-  } }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.4 -apple-system, "Inter", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
-  header { padding: 14px 20px 8px; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
-  h1 { font-size: 16px; margin: 0 12px 0 0; font-weight: 600; }
-  .sub { color: var(--ink2); font-size: 13px; }
-  .row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 6px 20px; }
-  label { color: var(--ink2); font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
-  input[type=number], select, button { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; }
-  input[type=number] { width: 64px; }
-  input[type=url] { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; width: min(480px, 60vw); }
-  .sub a { color: var(--ink2); }
-  button { cursor: pointer; } button:hover { border-color: var(--muted); } button.primary { border-color: var(--ink); }
-  button:disabled { opacity: .5; cursor: default; }
-  .tabs button { border-radius: 999px; padding: 3px 12px; } .tabs button[aria-selected=true] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 20px 10px; }
-  .chip { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
-  .chip .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
-  .chip.off { opacity: .55; }
-  .chip input[type=range] { width: 70px; }
-  .chip select { padding: 2px 4px; font-size: 12px; }
-  main { padding: 0 20px 30px; }
-  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin: 10px 0; padding: 8px 10px 4px; position: relative; }
-  .panel h2 { font-size: 13px; margin: 0 0 2px 6px; font-weight: 600; display: flex; gap: 14px; align-items: baseline; }
-  .panel h2 .legend { color: var(--ink2); font-weight: 400; font-size: 12px; display: inline-flex; gap: 12px; }
-  .legend i { display: inline-block; width: 14px; height: 2px; vertical-align: middle; margin-right: 4px; }
-  .legend b { display: inline-block; width: 7px; height: 7px; border-radius: 50%; vertical-align: middle; margin-right: 4px; }
-  svg { display: block; width: 100%; height: 190px; touch-action: none; }
-  .grid line { stroke: var(--grid); }
-  .axis line, .axis path { stroke: var(--axis); fill: none; }
-  .axis text { fill: var(--muted); font-size: 11px; }
-  .target { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-  .actual { fill: none; stroke-width: 1.5; opacity: .55; }
-  .dot { stroke: var(--surface); stroke-width: 1.5; }
-  .handle { stroke: var(--surface); stroke-width: 2; cursor: ns-resize; }
-  .handle:hover, .handle.active { stroke-width: 3; }
-  .hit { fill: transparent; cursor: ns-resize; }
-  .cross { stroke: var(--muted); stroke-dasharray: 3 3; pointer-events: none; }
-  .tip { position: fixed; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); max-width: 280px; z-index: 5; }
-  .tip .t { font-weight: 600; } .tip .a { color: var(--ink2); margin-bottom: 4px; }
-  .tip table { border-collapse: collapse; } .tip td { padding: 1px 6px 1px 0; color: var(--ink2); } .tip td.v { color: var(--ink); text-align: right; }
-  .stats { display: flex; gap: 20px; flex-wrap: wrap; color: var(--ink2); font-size: 13px; padding: 4px 20px; }
-  .stats b { color: var(--ink); font-weight: 600; }
-  details { margin: 12px 0; } summary { cursor: pointer; color: var(--ink2); }
-  table.list { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
-  table.list th, table.list td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--grid); }
-  table.list th { color: var(--muted); font-weight: 500; font-size: 12px; } table.list td.n { text-align: right; color: var(--ink2); }
-  .est { color: var(--muted); font-weight: 400; font-size: 11px; }
-  footer { padding: 16px 20px 28px; color: var(--muted); font-size: 12px; } footer a { color: var(--ink2); }
-  footer code { color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; user-select: all; }
-  #msg { color: var(--ink2); font-size: 13px; } #msg a { color: var(--ink); }
+
+  .vbg-custom-playlists { display: flex; flex-wrap: wrap; align-items: center; gap: var(--vbg-space-3) var(--vbg-space-6); }
+  .vbg-custom-playlists fieldset { display: flex; flex-wrap: wrap; gap: var(--vbg-space-2) var(--vbg-space-5); margin: 0; padding: 0; border: 0; min-width: 0; }
+  .vbg-custom-playlists label { display: inline-flex; align-items: center; gap: var(--vbg-space-2); color: var(--vbg-text-primary); font-size: var(--vbg-type-compact); line-height: var(--vbg-leading-compact); }
+  .vbg-custom-panels { display: grid; gap: var(--vbg-space-8); }
+  .vbg-custom-panels svg { display: block; width: 100%; height: 210px; touch-action: none; }
+  .vbg-viz-track { fill: var(--vbg-text-primary); }
+  .vbg-viz-track-path { fill: none; stroke: var(--vbg-border-strong); stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .vbg-viz-handle { cursor: ns-resize; }
+  .vbg-viz-handle:hover, .vbg-viz-handle[data-active] { stroke-width: 3; }
+  .vbg-viz-hit { fill: transparent; cursor: ns-resize; }
+
+  .vbg-custom-tip { position: fixed; z-index: 5; max-width: 320px; padding: var(--vbg-space-3); background: var(--vbg-surface-primary); color: var(--vbg-text-primary); border: 1px solid var(--vbg-border-default); border-radius: var(--vbg-radius-small); font-size: var(--vbg-type-compact); line-height: var(--vbg-leading-compact); pointer-events: none; }
+  .vbg-custom-tip-artist { color: var(--vbg-text-secondary); }
+  .vbg-custom-tip table { border-collapse: collapse; margin-block-start: var(--vbg-space-2); }
+  .vbg-custom-tip td { padding: 0 var(--vbg-space-4) 0 0; color: var(--vbg-text-secondary); vertical-align: baseline; }
+  .vbg-custom-tip td:last-child { padding-right: 0; }
+  .vbg-custom-tip td.vbg-numeric { color: var(--vbg-text-primary); }
+
+  .vbg-custom-tables details + details { margin-block-start: var(--vbg-space-8); }
+  .vbg-custom-tables details > .vbg-table-wrap { margin-block-start: var(--vbg-space-4); }
+  .vbg-custom-tables .vbg-caption { margin-block-start: var(--vbg-space-3); }
 </style>
 </head>
-<body>
-<header>
-  <h1 id="title">Playlist curve editor</h1>
-  <input type="url" id="link" placeholder="Paste a Spotify playlist or album link" spellcheck="false">
-  <button id="btnLoad" class="primary">Load</button>
-  <span class="sub" id="subtitle"></span>
-  <span style="flex:1"></span>
-  <button id="btnAuth" hidden>Log in with Spotify</button>
-</header>
-<div class="row">
-  <label>Playlists <input type="number" id="nPl" min="1" max="4" value="2"></label>
-  <label>Hours each <input type="number" id="hours" min="0.5" max="24" step="0.5" value="6"></label>
-  <span class="tabs" id="tabs"></span>
-  <span style="flex:1"></span>
-  <button id="btnCsv">Download CSVs</button>
-  <button id="btnUris">Copy URIs</button>
-  <button id="btnCreate" class="primary">Create on Spotify</button>
-  <button id="btnRefetch" title="Re-pull the source playlist from Spotify">Refetch</button>
-  <button id="btnEstimate" title="Predict features from the 30-second previews for tracks that have none" hidden>Estimate missing from audio</button>
+<body class="vbg-report">
+<div class="vbg-shell vbg-custom-page">
+  <a class="vbg-skip-link" href="#main">Skip to content</a>
+  <header class="vbg-header">
+    <div class="vbg-masthead">
+      <span class="vbg-identity">Playlist curves</span>
+      <div class="vbg-document-meta">
+        <span id="modeNote">Runs in this browser. Nothing is stored anywhere else.</span>
+        <button id="btnAuth" class="vbg-button" data-variant="tertiary" type="button" hidden>Log in with Spotify</button>
+      </div>
+    </div>
+    <h1 class="vbg-title" id="title">Reorder a playlist so its mood follows a curve</h1>
+    <p class="vbg-lede" id="subtitle">Paste a Spotify playlist or album link. Draw a shape for valence, tempo or energy over time and the tracks are reordered to follow it. Export the result as CSV, as URIs, or as new playlists on your account.</p>
+  </header>
+
+  <main id="main" class="vbg-custom-main">
+    <section class="vbg-stack" data-gap="tight" aria-label="Source">
+      <form class="vbg-custom-load" id="loadForm" novalidate>
+        <div class="vbg-field">
+          <label class="vbg-label" for="link">Spotify playlist or album link</label>
+          <input type="url" id="link" placeholder="https://open.spotify.com/playlist/…" spellcheck="false" autocomplete="off">
+        </div>
+        <div class="vbg-custom-load-actions">
+          <button type="submit" id="btnLoad" class="vbg-button" data-variant="primary">Load</button>
+          <button type="button" id="btnRefetch" class="vbg-button" title="Re-pull the source playlist from Spotify" hidden>Refetch</button>
+        </div>
+      </form>
+      <p class="vbg-caption" id="msg" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="vbg-stack vbg-custom-tool" data-gap="group" id="tool" aria-label="Curve editor" hidden>
+      <div class="vbg-custom-controls">
+        <fieldset>
+          <legend class="vbg-label">Length</legend>
+          <div class="vbg-custom-length-fields">
+            <div class="vbg-field">
+              <label class="vbg-label" for="nPl">Playlists</label>
+              <input type="number" id="nPl" min="1" max="4" value="2">
+            </div>
+            <div class="vbg-field">
+              <label class="vbg-label" for="hours">Hours each</label>
+              <div class="vbg-unit-field">
+                <input type="number" id="hours" min="0.5" max="24" step="0.5" value="6">
+                <span class="vbg-unit-suffix">h</span>
+              </div>
+            </div>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend class="vbg-label">Features to shape, with weight and starting shape</legend>
+          <div class="vbg-custom-feature-list" id="chips"></div>
+        </fieldset>
+      </div>
+
+      <div class="vbg-stack" data-gap="tight">
+        <div class="vbg-custom-playlists">
+          <fieldset id="tabs"><legend class="vbg-visually-hidden">Playlist shown in the charts and the track list</legend></fieldset>
+          <p class="vbg-meta" id="stats"></p>
+        </div>
+        <p class="vbg-caption">The line is the target. Drag the hollow handles to reshape it. Small dots are the tracks of the selected playlist at the time they play. Hover a chart to see the track.</p>
+      </div>
+
+      <div class="vbg-custom-panels" id="panels"></div>
+
+      <div class="vbg-cluster" aria-label="Export">
+        <button type="button" id="btnCreate" class="vbg-button" data-variant="primary">Create on Spotify</button>
+        <button type="button" id="btnUris" class="vbg-button">Copy URIs</button>
+        <button type="button" id="btnCsv" class="vbg-button">Download CSVs</button>
+        <button type="button" id="btnEstimate" class="vbg-button" title="Predict features from the 30-second previews for tracks that have none" hidden>Estimate missing from audio</button>
+      </div>
+    </section>
+
+    <section class="vbg-custom-tables" id="tables" aria-label="Track lists" hidden>
+      <details open><summary id="listSummary">Track order</summary><div id="list"></div></details>
+      <details><summary id="unplacedSummary">Unplaced tracks</summary><div id="unplaced"></div></details>
+    </section>
+  </main>
+
+  <footer class="vbg-footer">
+    <div>
+      <p id="redirectNote" hidden></p>
+      <p>Track data from <a href="https://open.spotify.com" target="_blank" rel="noopener">Spotify</a> and
+      <a href="https://reccobeats.com" target="_blank" rel="noopener">ReccoBeats</a>.
+      Playlists are created privately on your own account.
+      <a href="https://github.com/sofiiiiia/playlist-curves" target="_blank" rel="noopener">Source</a></p>
+    </div>
+  </footer>
 </div>
-<div class="row"><span id="msg"></span></div>
-<div class="chips" id="chips"></div>
-<div class="stats" id="stats"></div>
-<main id="panels"></main>
-<div class="tip" id="tip" hidden></div>
-<main>
-  <details open><summary id="listSummary">Track order</summary><div id="list"></div></details>
-  <details><summary id="unplacedSummary">Unplaced tracks</summary><div id="unplaced"></div></details>
-</main>
-<footer>
-  <div id="redirectNote" hidden style="margin-bottom:8px"></div>
-  Track data from <a href="https://open.spotify.com" target="_blank" rel="noopener">Spotify</a> and
-  <a href="https://reccobeats.com" target="_blank" rel="noopener">ReccoBeats</a>.
-  Playlists are created privately on your own account. Nothing is stored anywhere but your browser.
-  <a href="https://github.com/sofiiiiia/playlist-curves" target="_blank" rel="noopener">Source</a>
-</footer>
+<div class="vbg-custom-tip" id="tip" role="tooltip" hidden></div>
 
 <script>
-// ---------- feature definitions (fixed color order, never cycled) ----------
+// ---------- feature definitions ----------
 const FEATURES = [
   { key: 'valence',          label: 'Valence',          min: 0,   max: 1,   unit: '',    enabled: true,  weight: 1 },
   { key: 'tempo',            label: 'Tempo',            min: 60,  max: 220, unit: ' BPM', enabled: false, weight: 1 },
@@ -120,11 +162,11 @@ const FEATURES = [
   { key: 'speechiness',      label: 'Speechiness',      min: 0,   max: 0.6, unit: '',    enabled: false, weight: 1 },
 ];
 const PRESETS = {
-  sine:   { label: 'Sine (mid → peak → trough)', f: t => 0.5 + 0.5 * Math.sin(2 * Math.PI * t) },
+  sine:   { label: 'Sine: mid, peak, trough',    f: t => 0.5 + 0.5 * Math.sin(2 * Math.PI * t) },
   sineT:  { label: 'Sine from trough',            f: t => 0.5 - 0.5 * Math.cos(2 * Math.PI * t) },
   sine2:  { label: 'Two sine cycles',             f: t => 0.5 + 0.5 * Math.sin(4 * Math.PI * t) },
-  hill:   { label: 'Hill (low → high → low)',     f: t => Math.sin(Math.PI * t) },
-  valley: { label: 'Valley (high → low → high)',  f: t => 1 - Math.sin(Math.PI * t) },
+  hill:   { label: 'Hill: low, high, low',        f: t => Math.sin(Math.PI * t) },
+  valley: { label: 'Valley: high, low, high',     f: t => 1 - Math.sin(Math.PI * t) },
   rise:   { label: 'Rise',                        f: t => t },
   fall:   { label: 'Fall',                        f: t => 1 - t },
   flat:   { label: 'Flat',                        f: () => 0.5 },
@@ -134,6 +176,7 @@ const norm = (f, v) => (v - f.min) / (f.max - f.min);
 const denorm = (f, u) => f.min + u * (f.max - f.min);
 const fmt = (f, v) => f.key === 'tempo' ? Math.round(v) + f.unit : f.key === 'loudness' ? v.toFixed(1) + f.unit : v.toFixed(2);
 const hhmm = ms => { const m = Math.floor(ms / 60000); return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- state ----------
 let data = null, pool = [], unplaced = [], plans = [], selected = 0;
@@ -146,7 +189,7 @@ function interp(ys) {
   for (let i = 0; i < n - 1; i++) d.push((ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i]));
   m[0] = d[0]; m[n - 1] = d[n - 2];
   for (let i = 1; i < n - 1; i++) m[i] = d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2;
-  for (let i = 0; i < n - 1; i++) { // Fritsch–Carlson limiter
+  for (let i = 0; i < n - 1; i++) { // Fritsch-Carlson limiter
     if (d[i] === 0) { m[i] = m[i + 1] = 0; continue; }
     const a = m[i] / d[i], b = m[i + 1] / d[i], s = a * a + b * b;
     if (s > 9) { const tau = 3 / Math.sqrt(s); m[i] = tau * a * d[i]; m[i + 1] = tau * b * d[i]; }
@@ -226,137 +269,159 @@ function solve() {
 const $ = s => document.querySelector(s);
 const svgNS = 'http://www.w3.org/2000/svg';
 const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(svgNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
-const color = f => `var(--c-${f.key})`;
-const M = { l: 56, r: 16, t: 10, b: 26 };
+const M = { l: 60, r: 16, t: 12, b: 28 };
 let solveTimer = null;
 
 function renderChips() {
   const box = $('#chips'); box.innerHTML = '';
   for (const f of FEATURES) {
-    const chip = document.createElement('div'); chip.className = 'chip' + (f.enabled ? '' : ' off');
-    chip.innerHTML = `<span class="sw" style="background:${color(f)}"></span>
-      <label><input type="checkbox" ${f.enabled ? 'checked' : ''}> ${f.label}</label>
-      <label title="weight">w <input type="range" min="0" max="3" step="0.25" value="${f.weight}"></label>
-      <select title="preset shape">${Object.entries(PRESETS).map(([k, p]) => `<option value="${k}" ${f.preset === k ? 'selected' : ''}>${p.label}</option>`).join('')}</select>`;
-    const [cb, rg, sel] = [chip.querySelector('input[type=checkbox]'), chip.querySelector('input[type=range]'), chip.querySelector('select')];
-    cb.onchange = () => { f.enabled = cb.checked; chip.classList.toggle('off', !f.enabled); rebuild(); };
+    const row = document.createElement('div'); row.className = 'vbg-custom-feature';
+    row.innerHTML = `<label class="vbg-custom-feature-name"><input type="checkbox" ${f.enabled ? 'checked' : ''}> ${f.label}</label>
+      <input type="range" min="0" max="3" step="0.25" value="${f.weight}" aria-label="${f.label} weight" title="Weight: how much ${f.label.toLowerCase()} counts when several features are on" ${f.enabled ? '' : 'disabled'}>
+      <select aria-label="${f.label} starting shape" title="Starting shape for the ${f.label.toLowerCase()} curve" ${f.enabled ? '' : 'disabled'}>${Object.entries(PRESETS).map(([k, p]) => `<option value="${k}" ${f.preset === k ? 'selected' : ''}>${p.label}</option>`).join('')}${f.preset === 'custom' ? '<option value="custom" selected>Custom curve</option>' : ''}</select>`;
+    const cb = row.querySelector('input[type=checkbox]'), rg = row.querySelector('input[type=range]'), sel = row.querySelector('select');
+    cb.onchange = () => { f.enabled = cb.checked; rg.disabled = sel.disabled = !f.enabled; rebuild(); };
     rg.oninput = () => { f.weight = +rg.value; scheduleSolve(0); };
-    sel.onchange = () => { applyPreset(f, sel.value); rebuild(); };
-    box.appendChild(chip);
+    sel.onchange = () => { if (sel.value !== 'custom') { applyPreset(f, sel.value); rebuild(); } };
+    box.appendChild(row);
   }
 }
 
 function applyPreset(f, key) {
   f.preset = key;
-  // Fit the shape inside what the pool can deliver: 5th–95th percentile of this feature.
+  // Fit the shape inside what the pool can deliver: 5th to 95th percentile of this feature.
   const vs = pool.map(t => t.features[f.key]).sort((a, b) => a - b);
   const lo = norm(f, vs[Math.floor(vs.length * 0.05)] ?? f.min), hi = norm(f, vs[Math.ceil(vs.length * 0.95) - 1] ?? f.max);
   f.points = Array.from({ length: NPOINTS }, (_, i) => lo + (hi - lo) * PRESETS[key].f(i / (NPOINTS - 1)));
 }
 
+function missFor(f, order) {
+  if (!order.length) return null;
+  return order.reduce((s, t) => s + Math.abs(norm(f, t.features[f.key]) - norm(f, t.target[f.key])), 0) / order.length;
+}
+function missText(f) {
+  const m = missFor(f, plans[selected] || []);
+  return m === null ? 'No tracks placed' : `Average distance from target ${m.toFixed(3)} on a 0 to 1 scale, playlist ${selected + 1}`;
+}
+
 function renderPanels() {
   const box = $('#panels'); box.innerHTML = '';
-  const active = FEATURES.filter(f => f.enabled);
-  for (const f of active) {
-    const panel = document.createElement('div'); panel.className = 'panel';
-    panel.innerHTML = `<h2>${f.label}<span class="legend"><span><i style="background:${color(f)}"></i>target (drag the handles)</span><span><b style="background:${color(f)}"></b>tracks in playlist ${selected + 1}</span></span></h2>`;
-    const svg = el('svg', { viewBox: `0 0 900 190` }); panel.appendChild(svg);
-    box.appendChild(panel); drawPanel(svg, f);
+  for (const f of FEATURES.filter(f => f.enabled)) {
+    const fig = document.createElement('figure'); fig.className = 'vbg-chart'; fig.dataset.key = f.key;
+    fig.innerHTML = `<div class="vbg-chart-header"><h2 class="vbg-heading-16" id="h-${f.key}">${f.label}</h2><p class="vbg-meta vbg-custom-miss">${missText(f)}</p></div>
+      <div class="vbg-chart-viewport" tabindex="0" aria-labelledby="h-${f.key}"></div>`;
+    const svg = el('svg', { viewBox: '0 0 900 210', role: 'img', 'aria-label': `${f.label} over time: target curve and placed tracks` });
+    fig.querySelector('.vbg-chart-viewport').appendChild(svg);
+    box.appendChild(fig); drawPanel(svg, f);
   }
 }
 
 function drawPanel(svg, f) {
   svg.innerHTML = '';
-  const W = Math.max(600, Math.round(svg.getBoundingClientRect().width || 900)), Hh = 190;
+  const W = Math.max(320, Math.round(svg.getBoundingClientRect().width || 900)), Hh = 210;
   svg.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
   const x0 = M.l, x1 = W - M.r, y0 = M.t, y1 = Hh - M.b;
   const T = state.hours * 3.6e6;
   const X = ms => x0 + (x1 - x0) * ms / T, Y = u => y1 - (y1 - y0) * Math.min(1, Math.max(0, u));
-  const grid = el('g', { class: 'grid' }, svg), axis = el('g', { class: 'axis' }, svg);
+  const grid = el('g', {}, svg), axis = el('g', {}, svg);
   for (const u of [0, 0.5, 1]) {
-    el('line', { x1: x0, x2: x1, y1: Y(u), y2: Y(u) }, grid);
-    const t = el('text', { x: x0 - 8, y: Y(u) + 4, 'text-anchor': 'end' }, axis); t.textContent = fmt(f, denorm(f, u));
+    el('line', { class: 'vbg-chart-gridline', x1: x0, x2: x1, y1: Y(u), y2: Y(u) }, grid);
+    const t = el('text', { class: 'vbg-chart-annotation', x: x0 - 10, y: Y(u) + 4, 'text-anchor': 'end' }, axis); t.textContent = fmt(f, denorm(f, u));
   }
-  el('line', { x1: x0, x2: x1, y1: y1, y2: y1 }, axis);
+  el('line', { class: 'vbg-chart-axis', x1: x0, x2: x1, y1: y1, y2: y1 }, axis);
   for (let h = 0; h <= state.hours; h += state.hours > 8 ? 2 : 1) {
-    const t = el('text', { x: X(h * 3.6e6), y: y1 + 16, 'text-anchor': 'middle' }, axis); t.textContent = h + 'h';
+    const t = el('text', { class: 'vbg-chart-annotation', x: X(h * 3.6e6), y: y1 + 18, 'text-anchor': 'middle' }, axis); t.textContent = h + ' h';
   }
   // actual tracks
   const order = plans[selected] || [];
   if (order.length) {
     const pts = order.map(o => [X(o.start + o.duration / 2), Y(norm(f, o.features[f.key]))]);
-    el('path', { class: 'actual', stroke: color(f), d: 'M' + pts.map(p => p.join(',')).join('L') }, svg);
+    el('path', { class: 'vbg-viz-track-path', d: 'M' + pts.map(p => p.join(',')).join('L') }, svg);
     const g = el('g', {}, svg);
-    pts.forEach(p => el('circle', { class: 'dot', cx: p[0], cy: p[1], r: 3.2, fill: color(f) }, g));
+    pts.forEach(p => el('circle', { class: 'vbg-viz-track', cx: p[0], cy: p[1], r: 3 }, g));
   }
   // target curve
   const g = interp(f.points), steps = 120;
   const d = Array.from({ length: steps + 1 }, (_, i) => { const t = i / steps; return `${X(t * T).toFixed(1)},${Y(g(t)).toFixed(1)}`; });
-  el('path', { class: 'target', stroke: color(f), d: 'M' + d.join('L') }, svg);
+  el('path', { class: 'vbg-series-stroke vbg-series-1', d: 'M' + d.join('L') }, svg);
   // handles
   f.points.forEach((u, i) => {
     const cx = X(i / (NPOINTS - 1) * T), cy = Y(u);
-    const hit = el('rect', { class: 'hit', x: cx - 14, y: y0 - 6, width: 28, height: y1 - y0 + 12 }, svg);
-    const h = el('circle', { class: 'handle', cx, cy, r: 6.5, fill: color(f) }, svg);
+    const hit = el('rect', { class: 'vbg-viz-hit', x: cx - 14, y: y0 - 6, width: 28, height: y1 - y0 + 12 }, svg);
+    const h = el('circle', { class: 'vbg-data-point vbg-series-1 vbg-viz-handle', cx, cy, r: 6.5 }, svg);
     const start = ev => {
-      ev.preventDefault(); h.classList.add('active'); hideTip();
+      ev.preventDefault(); h.setAttribute('data-active', ''); hideTip();
       const move = e => {
         const r = svg.getBoundingClientRect(); const yy = (e.clientY - r.top) * Hh / r.height;
         f.points[i] = Math.min(1, Math.max(0, (y1 - yy) / (y1 - y0)));
-        f.preset = 'custom'; drawPanel(svg, f); scheduleSolve(80);
+        if (f.preset !== 'custom') { f.preset = 'custom'; renderChips(); }
+        drawPanel(svg, f); scheduleSolve(80);
       };
-      const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); h.classList.remove('active'); scheduleSolve(0); };
+      const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); h.removeAttribute('data-active'); scheduleSolve(0); };
       window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
     };
     hit.addEventListener('pointerdown', start); h.addEventListener('pointerdown', start);
   });
   // hover crosshair / tooltip
-  const cross = el('line', { class: 'cross', x1: 0, x2: 0, y1: y0, y2: y1, visibility: 'hidden' }, svg);
+  el('line', { class: 'vbg-chart-annotation-line vbg-viz-cross', x1: 0, x2: 0, y1: y0, y2: y1, visibility: 'hidden' }, svg);
   svg.addEventListener('pointermove', e => {
     if (e.buttons) return;
     const r = svg.getBoundingClientRect(); const xx = (e.clientX - r.left) * W / r.width;
     const ms = (xx - x0) / (x1 - x0) * T;
     const o = order.find(o => ms >= o.start && ms < o.start + o.duration);
-    document.querySelectorAll('.cross').forEach(c => { c.setAttribute('x1', xx); c.setAttribute('x2', xx); c.setAttribute('visibility', o ? 'visible' : 'hidden'); });
+    document.querySelectorAll('.vbg-viz-cross').forEach(c => { c.setAttribute('x1', xx); c.setAttribute('x2', xx); c.setAttribute('visibility', o ? 'visible' : 'hidden'); });
     if (o) showTip(e, o); else hideTip();
   });
-  svg.addEventListener('pointerleave', () => { document.querySelectorAll('.cross').forEach(c => c.setAttribute('visibility', 'hidden')); hideTip(); });
+  svg.addEventListener('pointerleave', () => { document.querySelectorAll('.vbg-viz-cross').forEach(c => c.setAttribute('visibility', 'hidden')); hideTip(); });
 }
 
 function showTip(e, o) {
   const tip = $('#tip'); tip.hidden = false;
-  const rows = FEATURES.filter(f => f.enabled).map(f => `<tr><td>${f.label}</td><td class="v">${fmt(f, o.features[f.key])}</td><td>target ${fmt(f, o.target[f.key])}</td></tr>`).join('');
-  tip.innerHTML = `<div class="t">${o.title}${o.estimated ? ' <span class="est">≈ estimated from audio</span>' : ''}</div><div class="a">${o.artist} · starts ${hhmm(o.start)}</div><table>${rows}</table>`;
+  const rows = FEATURES.filter(f => f.enabled).map(f => `<tr><td>${f.label}</td><td class="vbg-numeric">${fmt(f, o.features[f.key])}</td><td>target ${fmt(f, o.target[f.key])}</td></tr>`).join('');
+  tip.innerHTML = `<div><strong>${esc(o.title)}</strong>${o.estimated ? ' <span class="vbg-custom-tip-artist">(estimated from audio)</span>' : ''}</div><div class="vbg-custom-tip-artist">${esc(o.artist)}, starts ${hhmm(o.start)}</div><table>${rows}</table>`;
   const x = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 10);
   tip.style.left = x + 'px'; tip.style.top = (e.clientY + 14) + 'px';
 }
 function hideTip() { $('#tip').hidden = true; }
 
 function renderTabs() {
-  const box = $('#tabs'); box.innerHTML = '';
-  plans.forEach((_, i) => { const b = document.createElement('button'); b.textContent = `Playlist ${i + 1}`; b.setAttribute('aria-selected', i === selected); b.onclick = () => { selected = i; renderAll(false); }; box.appendChild(b); });
+  const box = $('#tabs'); box.querySelectorAll('label').forEach(l => l.remove());
+  plans.forEach((_, i) => {
+    const l = document.createElement('label');
+    const r = document.createElement('input'); r.type = 'radio'; r.name = 'playlist'; r.value = i; r.checked = i === selected;
+    r.onchange = () => { selected = i; renderAll(false); };
+    l.appendChild(r); l.appendChild(document.createTextNode(`Playlist ${i + 1}`)); box.appendChild(l);
+  });
 }
 
 function renderStats() {
-  const active = FEATURES.filter(f => f.enabled);
-  $('#stats').innerHTML = plans.map((o, i) => {
-    const dur = o.reduce((s, t) => s + t.duration, 0) / 3.6e6;
-    const miss = active.map(f => `${f.label.toLowerCase()} miss <b>${(o.reduce((s, t) => s + Math.abs(norm(f, t.features[f.key]) - norm(f, t.target[f.key])), 0) / Math.max(1, o.length)).toFixed(3)}</b>`).join(' · ');
-    return `<span>Playlist ${i + 1}: <b>${o.length}</b> tracks, <b>${dur.toFixed(2)} h</b> · ${miss}</span>`;
-  }).join('');
+  const o = plans[selected] || [];
+  const dur = o.reduce((s, t) => s + t.duration, 0) / 3.6e6;
+  $('#stats').textContent = `${o.length} tracks, ${dur.toFixed(2)} h`;
+  document.querySelectorAll('#panels figure').forEach(fig => {
+    const f = FEATURES.find(f => f.key === fig.dataset.key);
+    if (f) fig.querySelector('.vbg-custom-miss').textContent = missText(f);
+  });
 }
 
 function renderList() {
   const active = FEATURES.filter(f => f.enabled), o = plans[selected] || [];
-  $('#listSummary').textContent = `Track order · playlist ${selected + 1} (${o.length} tracks)`;
-  $('#list').innerHTML = `<table class="list"><tr><th>#</th><th>Start</th><th>Title</th><th>Artist</th>${active.map(f => `<th>${f.label}</th>`).join('')}</tr>` +
-    o.map((t, i) => `<tr><td class="n">${i + 1}</td><td class="n">${hhmm(t.start)}</td><td>${t.title}${t.estimated ? ' <span class="est" title="features estimated from the audio preview">≈</span>' : ''}</td><td>${t.artist}</td>${active.map(f => `<td class="n">${t.estimated ? '≈' : ''}${fmt(f, t.features[f.key])}</td>`).join('')}</tr>`).join('') + '</table>';
+  $('#listSummary').textContent = `Track order, playlist ${selected + 1}: ${o.length} tracks`;
+  const anyEst = o.some(t => t.estimated);
+  $('#list').innerHTML = `<div class="vbg-table-wrap"><table>
+    <caption class="vbg-visually-hidden">Tracks of playlist ${selected + 1} in playing order, with the audio feature values used to place them</caption>
+    <thead><tr><th scope="col" class="vbg-numeric">Start</th><th scope="col">Title</th><th scope="col">Artist</th>${active.map(f => `<th scope="col" class="vbg-numeric">${f.label}</th>`).join('')}</tr></thead>
+    <tbody>${o.map(t => `<tr><td class="vbg-numeric">${hhmm(t.start)}</td><td>${esc(t.title)}</td><td>${esc(t.artist)}</td>${active.map(f => `<td class="vbg-numeric">${t.estimated ? '≈ ' : ''}${fmt(f, t.features[f.key])}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table></div>` + (anyEst ? '<p class="vbg-caption">≈ marks values estimated from the track\'s audio preview. Valence estimates are typically within 0.15 of Spotify\'s figure.</p>' : '');
   const used = new Set(plans.flat().map(t => t.id));
   const left = pool.filter(t => !used.has(t.id));
-  $('#unplacedSummary').textContent = `Unplaced tracks · ${unplaced.length} without feature data, ${left.length} not needed for the chosen length`;
-  $('#unplaced').innerHTML = `<table class="list"><tr><th>Title</th><th>Artist</th><th>Why</th></tr>` +
-    unplaced.map(t => `<tr><td>${t.title}</td><td>${t.artist}</td><td>no audio features available — use "Estimate missing from audio"</td></tr>`).join('') +
-    left.map(t => `<tr><td>${t.title}</td><td>${t.artist}</td><td>playlists are full</td></tr>`).join('') + '</table>';
+  $('#unplacedSummary').textContent = `Unplaced tracks: ${unplaced.length} without feature data, ${left.length} not needed for the chosen length`;
+  const noFeat = MODE === 'local' ? 'No audio features available. Use Estimate missing from audio.' : 'No audio features available from ReccoBeats.';
+  $('#unplaced').innerHTML = `<div class="vbg-table-wrap"><table>
+    <caption class="vbg-visually-hidden">Tracks left out of every playlist and the reason</caption>
+    <thead><tr><th scope="col">Title</th><th scope="col">Artist</th><th scope="col">Reason</th></tr></thead>
+    <tbody>${unplaced.map(t => `<tr><td>${esc(t.title)}</td><td>${esc(t.artist)}</td><td>${noFeat}</td></tr>`).join('')}${left.map(t => `<tr><td>${esc(t.title)}</td><td>${esc(t.artist)}</td><td>Playlists are full.</td></tr>`).join('')}</tbody>
+    </table></div>`;
 }
 
 function renderAll(resolve = true) {
@@ -366,8 +431,14 @@ function renderAll(resolve = true) {
 function rebuild() { renderAll(true); }
 function scheduleSolve(ms) {
   clearTimeout(solveTimer);
-  solveTimer = setTimeout(() => { solve(); renderStats(); document.querySelectorAll('.panel svg').forEach((svg, i) => drawPanel(svg, FEATURES.filter(f => f.enabled)[i])); renderList(); }, ms);
+  solveTimer = setTimeout(() => {
+    solve(); renderStats();
+    document.querySelectorAll('#panels figure').forEach(fig => { const f = FEATURES.find(f => f.key === fig.dataset.key); if (f) drawPanel(fig.querySelector('svg'), f); });
+    renderList();
+  }, ms);
 }
+let resizeTimer = null;
+window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => document.querySelectorAll('#panels figure').forEach(fig => { const f = FEATURES.find(f => f.key === fig.dataset.key); if (f) drawPanel(fig.querySelector('svg'), f); }), 100); });
 
 // ---------- backend: local server if present, otherwise talk to Spotify + ReccoBeats directly ----------
 // Public by design (PKCE needs no secret). Fork? Put your own app's Client ID here and add your
@@ -423,19 +494,20 @@ async function getToken() {
 }
 function logout() { localStorage.removeItem('spotifyToken'); renderAuth(); msg('Logged out.'); }
 async function renderAuth() {
-  const b = $('#btnAuth');
-  if (MODE === 'local') { b.hidden = true; return; }
+  const b = $('#btnAuth'), note = $('#modeNote');
+  if (MODE === 'local') { b.hidden = true; note.textContent = 'Local server. Logged in through token.json.'; return; }
   const tok = await getToken(); b.hidden = false;
+  note.textContent = tok ? 'Logged in to Spotify in this browser.' : 'Runs in this browser. Nothing is stored anywhere else.';
   b.textContent = tok ? 'Log out' : 'Log in with Spotify'; b.onclick = tok ? logout : login;
   b.title = tok ? '' : `Redirect URI this page uses: ${redirectUri()} (must be listed in the Spotify app's settings)`;
   $('#redirectNote').hidden = !!tok;
-  $('#redirectNote').innerHTML = `Login redirect URI for this page, add it in the Spotify app's settings: <code>${redirectUri()}</code>`;
+  $('#redirectNote').innerHTML = `Login redirect URI for this page, to add in the Spotify app's settings: <code>${esc(redirectUri())}</code>`;
 }
 
 // --- Spotify Web API from the browser ---
 async function sp(path, opts = {}) {
   const tok = await getToken();
-  if (!tok) throw new Error('Log in with Spotify first (button top right).');
+  if (!tok) throw new Error('Log in with Spotify first (top right).');
   const r = await fetch(path.startsWith('http') ? path : 'https://api.spotify.com/v1/' + path,
     { ...opts, headers: { Authorization: 'Bearer ' + tok, ...(opts.body ? { 'Content-Type': 'application/json' } : {}) } });
   if (r.status === 429) { await sleep((+r.headers.get('Retry-After') || 2) * 1000); return sp(path, opts); }
@@ -480,7 +552,7 @@ async function fetchFeaturesDirect(tracks, refetch) {
     const b = missing.slice(i, i + 40), found = {};
     for (const c of (await rb('https://api.reccobeats.com/v1/audio-features?ids=' + b.join(','))).content || []) found[c.href.split('/').pop()] = c;
     for (const id of b) cache[id] = found[id] ? pickFeats(found[id]) : null;
-    msg(`Looking up audio features… ${Math.min(i + 40, missing.length)}/${missing.length}`);
+    msg(`Looking up audio features, ${Math.min(i + 40, missing.length)} of ${missing.length}`);
   }
   for (const t of tracks) {  // retry unknown ids by title + artist (other release of the same song)
     if (cache[t.id] !== null || cache['s:' + t.id]) continue;
@@ -531,8 +603,8 @@ const api = {
 function csvFor(o) {
   const active = FEATURES.filter(f => f.enabled);
   const head = ['pos', 'start', 'title', 'artist', ...active.flatMap(f => [f.key, f.key + '_target']), 'uri'];
-  const esc = s => `"${String(s).replace(/"/g, '""')}"`;
-  return [head.join(','), ...o.map((t, i) => [i + 1, hhmm(t.start), esc(t.title), esc(t.artist), ...active.flatMap(f => [t.features[f.key], t.target[f.key].toFixed(3)]), t.uri].join(','))].join('\n');
+  const q = s => `"${String(s).replace(/"/g, '""')}"`;
+  return [head.join(','), ...o.map((t, i) => [i + 1, hhmm(t.start), q(t.title), q(t.artist), ...active.flatMap(f => [t.features[f.key], t.target[f.key].toFixed(3)]), t.uri].join(','))].join('\n');
 }
 $('#btnCsv').onclick = () => plans.forEach((o, i) => {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csvFor(o)], { type: 'text/csv' })); a.download = `playlist_${i + 1}.csv`; a.click();
@@ -543,29 +615,28 @@ $('#btnUris').onclick = async () => {
 };
 $('#btnCreate').onclick = async () => {
   if (MODE === 'static' && !(await getToken())) { msg('Log in with Spotify (top right) to create playlists on your account, or use Copy URIs and paste into the Spotify app.'); return; }
-  const base = prompt('Playlist name (a number is appended for each)', `${data.name} — shaped`);
+  const base = prompt('Playlist name (a number is appended for each)', `${data.name}, shaped`);
   if (!base) return;
   const shape = FEATURES.filter(f => f.enabled).map(f => `${f.label.toLowerCase()}: ${PRESETS[f.preset]?.label ?? 'custom curve'}`).join('; ');
   $('#btnCreate').disabled = true; msg('Creating on Spotify…');
   try {
     const created = await api.create(plans.map((o, i) => ({ name: `${base} ${i + 1}/${plans.length}`, description: shape, uris: o.map(t => t.uri) })));
-    msg('Created: ' + created.map(c => `<a href="${c.url}" target="_blank">${c.name}</a> (${c.count} tracks)`).join(' · '));
+    msg('Created: ' + created.map(c => `<a href="${c.url}" target="_blank" rel="noopener">${esc(c.name)}</a> (${c.count} tracks)`).join(', '));
   } catch (e) { msg('Failed: ' + e.message); }
   $('#btnCreate').disabled = false;
 };
 $('#btnRefetch').onclick = () => load(true);
 $('#btnEstimate').onclick = async () => {
-  $('#btnEstimate').disabled = true; msg('Analyzing previews… this takes a few seconds per track.');
+  $('#btnEstimate').disabled = true; msg('Analyzing previews. This takes a few seconds per track.');
   try {
     const r = await fetch('/api/estimate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ link: data.url }) });
     const j = await r.json(); if (j.error) throw new Error(j.error);
     await load(false);
-    msg(`Estimated ${j.estimated} track${j.estimated === 1 ? '' : 's'} from audio${j.no_preview ? `, ${j.no_preview} had no preview` : ''}. Estimates are marked ≈ and are rough (valence typically within ±0.15).`);
+    msg(`Estimated ${j.estimated} track${j.estimated === 1 ? '' : 's'} from audio${j.no_preview ? `, ${j.no_preview} had no preview` : ''}. Estimates are marked ≈ and are rough: valence is typically within 0.15.`);
   } catch (e) { msg('Estimate failed: ' + e.message); }
   $('#btnEstimate').disabled = false;
 };
-$('#btnLoad').onclick = () => load(false);
-$('#link').addEventListener('keydown', e => { if (e.key === 'Enter') load(false); });
+$('#loadForm').addEventListener('submit', e => { e.preventDefault(); load(false); });
 $('#nPl').onchange = e => { state.nPl = Math.max(1, Math.min(4, +e.target.value)); selected = 0; rebuild(); };
 $('#hours').onchange = e => { state.hours = Math.max(0.5, +e.target.value); state.userSetHours = true; rebuild(); };
 function msg(html) { $('#msg').innerHTML = html; }
@@ -581,13 +652,14 @@ async function load(refetch = false) {
     pool = data.tracks.filter(t => t.features); unplaced = data.tracks.filter(t => !t.features);
     const total = data.tracks.reduce((s, t) => s + t.duration, 0) / 3.6e6;
     $('#title').textContent = data.name;
-    $('#subtitle').innerHTML = `${data.tracks.length} tracks · ${total.toFixed(1)} h · ${pool.length} with audio features · <a href="${data.url}" target="_blank">open in Spotify</a>`;
-    document.title = data.name + ' · curve editor';
+    $('#subtitle').innerHTML = `${data.tracks.length} tracks, ${total.toFixed(1)} hours, ${pool.length} with audio features. <a href="${data.url}" target="_blank" rel="noopener">Open in Spotify</a>.`;
+    document.title = data.name + ', playlist curves';
     // default length: whole thing in one go, rounded to the half hour, unless the user set something
     if (!state.userSetHours) { state.hours = Math.max(0.5, Math.round(total / state.nPl * 2) / 2); $('#hours').value = state.hours; }
     FEATURES.forEach(f => applyPreset(f, f.preset && f.preset !== 'custom' ? f.preset : (f.key === 'valence' ? 'sine' : 'flat')));
     $('#btnEstimate').hidden = MODE !== 'local' || unplaced.length === 0;
     $('#btnRefetch').hidden = MODE !== 'local';
+    $('#tool').hidden = false; $('#tables').hidden = false;
     renderChips(); rebuild(); msg(refetch ? 'Refetched.' : '');
   } catch (e) { msg('Could not load: ' + e.message); }
   $('#btnLoad').disabled = false;
@@ -600,7 +672,7 @@ async function load(refetch = false) {
   $('#link').value = last;
   if (MODE === 'local') load();
   else if (last) load();
-  else msg('Paste a Spotify playlist or album link and press Load. Log in with Spotify only if you want the playlists created on your account; Copy URIs and CSV work without it.');
+  else msg('Paste a Spotify playlist or album link and press Load. Log in with Spotify only if you want the playlists created on your account. Copy URIs and CSV work without it.');
 })();
 </script>
 </body>

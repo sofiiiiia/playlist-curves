@@ -57,6 +57,11 @@ python3 local_server.py
 Opens <http://127.0.0.1:8765>. The first run pops a browser tab to log into Spotify;
 the token is saved to `token.json` and refreshed automatically afterwards.
 
+The page is built on Vercel's Geist design foundation. `assets/vercel-brand.css` is the
+published stylesheet, loaded unchanged, with Geist from Google Fonts; everything
+page-specific (control lanes, chart marks, tooltip) is a handful of `vbg-custom-*` and
+`vbg-viz-*` rules at the top of `index.html`. Light and dark follow the system setting.
+
 - Tick a feature chip to add its panel. Drag the handles to shape the curve, or pick a
   preset (sine, two cycles, hill, valley, rise, fall, flat).
 - The weight slider decides how much each feature counts when several are on.
@@ -113,6 +118,7 @@ data are listed under Unplaced.
 | `spotify_sine.py` | Spotify auth, fetch, ReccoBeats lookup, CLI planner, chart |
 | `estimate_features.py` | predicts features from preview audio for tracks with none |
 | `api/tracks.js` | Vercel function: reads public playlists/albums with app credentials, no user login |
+| `assets/vercel-brand.css` | Vercel's published Geist foundation stylesheet, unchanged; type, color, controls and tables come from it |
 | `config.example.json` | template for `config.json` |
 
 `config.json`, `token.json`, the `cache/` and `previews/` folders, and `features.json`
