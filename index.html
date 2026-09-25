@@ -24,7 +24,8 @@
   .vbg-custom-swatch { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 2px; background: var(--pc-color); vertical-align: middle; }
   .vbg-custom-feature[data-off] .vbg-custom-swatch { background: transparent; box-shadow: inset 0 0 0 1.5px var(--pc-color); }
   .vbg-custom-chart-title { display: flex; align-items: center; gap: var(--vbg-space-2); }
-  .vbg-custom-term { text-decoration: underline dotted; text-decoration-color: var(--vbg-border-default); text-decoration-thickness: 1px; text-underline-offset: 4px; cursor: help; }
+  .vbg-custom-term { text-decoration: underline dotted; text-decoration-color: color-mix(in srgb, var(--pc-color) 75%, transparent); text-decoration-thickness: 1.5px; text-underline-offset: 4px; cursor: help; }
+  .vbg-custom-term:hover { text-decoration-color: var(--pc-color); }
   .vbg-custom-main { display: grid; gap: var(--vbg-space-12); }
   .vbg-custom-main > * { min-width: 0; }
 

@@ -10,3 +10,4 @@ features.json
 plan_*.csv
 *.log
 docs/
+assets/*.ttf

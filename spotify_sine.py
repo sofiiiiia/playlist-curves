@@ -300,39 +300,47 @@ def report(plans, name):
 
 
 def chart(plans, name):
-    """Small multiples, one per playlist. Colors: default validated palette slots 1-2
-    (blue = track valence, orange = target sine); text/grid use ink tokens."""
+    """Small multiples, one per playlist, styled like the web editor: Geist type, one
+    color for the feature (valence blue), gray text and gridlines, direct labels."""
     import matplotlib; matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    SURF, INK, INK2, MUTED, GRID, AXIS = "#fcfcfb", "#0b0b0b", "#52514e", "#898781", "#e1e0d9", "#c3c2b7"
-    S1, S2 = "#2a78d6", "#eb6834"
+    from matplotlib import font_manager, ticker
+    for f in ("Geist.ttf", "Geist-Medium.ttf"):
+        fp = os.path.join(HERE, "assets", f)
+        if os.path.exists(fp): font_manager.fontManager.addfont(fp)
+    if any(f.name == "Geist" for f in font_manager.fontManager.ttflist):
+        plt.rcParams["font.family"] = "Geist"
+    SURF, INK, INK2, GRID, AXIS, BLUE = "#ffffff", "#171717", "#666666", "#ebebeb", "#d4d4d4", "#2a78d6"
     n = len(plans)
-    fig, axes = plt.subplots(n, 1, figsize=(10, 2.8 * n + 0.8), squeeze=False)
+    fig, axes = plt.subplots(n, 1, figsize=(10, 2.9 * n + 0.9), squeeze=False)
     fig.patch.set_facecolor(SURF)
     for ax, order, i in zip(axes[:, 0], plans, range(1, n + 1)):
         ax.set_facecolor(SURF)
         xs = [(t["start_ms"] + t["duration"] / 2) / 3.6e6 for t in order]
-        ax.plot(xs, [t["target"] for t in order], color=S2, lw=2, solid_joinstyle="round", label="target sine")
-        ax.plot(xs, [t["valence"] for t in order], color=S1, lw=2, marker="o", ms=5,
-                markeredgecolor=SURF, markeredgewidth=1, label="track valence")
-        yv, yt = order[-1]["valence"], order[-1]["target"]
-        if abs(yv - yt) < 0.07:  # keep end labels from colliding
-            yv, yt = (yv - 0.035, yt + 0.035) if yv <= yt else (yv + 0.035, yt - 0.035)
-        ax.text(xs[-1] + 0.05, yv, "track valence", color=INK2, fontsize=8, va="center")
-        ax.text(xs[-1] + 0.05, yt, "target sine", color=INK2, fontsize=8, va="center")
-        ax.set_ylim(0, 1); ax.set_xlim(0, xs[-1] + 0.6)
-        ax.set_ylabel("valence", color=INK2, fontsize=9)
-        ax.set_title(f"Playlist {i}  ·  {len(order)} tracks, {sum(t['duration'] for t in order)/3.6e6:.1f} h",
-                     loc="left", fontsize=10, color=INK)
-        for sp in ("top", "right"): ax.spines[sp].set_visible(False)
-        for sp in ("left", "bottom"): ax.spines[sp].set_color(AXIS)
-        ax.tick_params(colors=MUTED, labelsize=8)
+        vs, tg = [t["valence"] for t in order], [t["target"] for t in order]
+        ax.plot(xs, vs, color=BLUE, lw=0.8, alpha=0.45, solid_joinstyle="round")
+        ax.scatter(xs, vs, s=11, color=BLUE, zorder=3)
+        ax.plot(xs, tg, color=BLUE, lw=2.4, solid_joinstyle="round", solid_capstyle="round", zorder=2)
+        yv, yt = vs[-1], tg[-1]
+        if abs(yv - yt) < 0.08:  # keep end labels from colliding
+            yv, yt = (yv - 0.04, yt + 0.04) if yv <= yt else (yv + 0.04, yt - 0.04)
+        ax.text(xs[-1] + 0.06, yt, "target", color=INK, fontsize=8, va="center")
+        ax.text(xs[-1] + 0.06, yv, "tracks", color=INK2, fontsize=8, va="center")
+        miss = sum(abs(v - t) for v, t in zip(vs, tg)) / max(1, len(order))
+        hours = sum(t["duration"] for t in order) / 3.6e6
+        ax.set_ylim(0, 1); ax.set_xlim(0, xs[-1] + 0.7)
+        ax.set_yticks([0, 0.5, 1]); ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.2f"))
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(2 if hours > 8 else 1))
+        ax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f"{x:g} h"))
+        ax.set_title(f"Playlist {i}", loc="left", fontsize=10.5, color=INK, fontweight="medium", pad=30)
+        ax.text(0, 1.045, f"{len(order)} tracks, {hours:.2f} h. Average distance from target {miss:.3f} on a 0 to 1 scale.",
+                transform=ax.transAxes, color=INK2, fontsize=8, va="bottom")
+        for sp in ("top", "right", "left"): ax.spines[sp].set_visible(False)
+        ax.spines["bottom"].set_color(AXIS)
+        ax.tick_params(colors=INK2, labelsize=8, length=0, pad=6)
         ax.grid(axis="y", color=GRID, lw=0.8); ax.set_axisbelow(True)
-    axes[-1, 0].set_xlabel("hours into playlist", color=INK2, fontsize=9)
-    leg = axes[0, 0].legend(frameon=False, loc="upper right", fontsize=8)
-    for txt in leg.get_texts(): txt.set_color(INK2)
-    fig.suptitle(f"{name}: valence over time", x=0.01, ha="left", fontsize=11, color=INK)
-    fig.tight_layout()
+    fig.suptitle(f"{name}: valence over time", x=0.012, ha="left", fontsize=12, color=INK, fontweight="medium")
+    fig.tight_layout(rect=(0, 0, 1, 0.97))
     out = os.path.join(HERE, "valence_plan.png"); fig.savefig(out, dpi=150, facecolor=SURF); print(f"  wrote {out}")
 
 
