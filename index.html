@@ -13,7 +13,7 @@
   /* Page-owned layout. Only vbg-custom-* / vbg-viz-* selectors, only public tokens. */
   .vbg-custom-page [hidden] { display: none !important; }
   /* Full-width editor: the charts want every pixel, so drop the shell's fixed content width. */
-  .vbg-custom-page { width: calc(100% - 48px); max-width: none; }
+  .vbg-custom-page { width: calc(100% - 2 * clamp(24px, 3vw, 56px)); max-width: none; }
   /* One fixed color per feature, used wherever that feature appears: row, chart, tooltip. */
   .vbg-custom-page {
     --pc-valence: light-dark(#2a78d6, #3987e5); --pc-tempo: light-dark(#eb6834, #d95926);
