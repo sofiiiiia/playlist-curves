@@ -14,8 +14,10 @@
   .vbg-custom-page [hidden] { display: none !important; }
   /* Full-width editor: the charts want every pixel, so drop the shell's fixed content width. */
   .vbg-custom-page { width: calc(100% - 2 * clamp(24px, 3vw, 56px)); max-width: none; padding-block-start: var(--vbg-space-6); }
-  /* Cover art: top right, under the masthead's login line, level with the title. */
-  .vbg-custom-cover { grid-column: 9 / span 2; grid-row: 2 / span 2; justify-self: start; align-self: start; width: clamp(112px, 12vw, 192px); aspect-ratio: 1; object-fit: cover; border-radius: var(--vbg-radius-small); margin-block-start: clamp(32px, 4vw, 48px); }
+  /* Cover art: top right, under the masthead's login line, level with the title. The header's
+     third row soaks up the cover's extra height so the title and summary stay together. */
+  .vbg-custom-page > .vbg-header:has(> .vbg-custom-cover:not([hidden])) { grid-template-rows: auto auto minmax(0, 1fr); }
+  .vbg-custom-cover { grid-column: 9 / -1; grid-row: 2 / span 2; justify-self: end; align-self: start; width: clamp(200px, 22vw, 320px); aspect-ratio: 1; object-fit: cover; border-radius: var(--vbg-radius-small); margin-block-start: clamp(32px, 4vw, 48px); }
   @media (max-width: 760px) { .vbg-custom-cover { grid-column: 1 / -1; grid-row: auto; justify-self: start; width: 112px; margin-block-start: var(--vbg-space-4); } }
   /* One fixed color per feature, used wherever that feature appears: row, chart, tooltip. */
   .vbg-custom-page {
