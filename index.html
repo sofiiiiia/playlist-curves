@@ -63,8 +63,9 @@
   }
 
   .vbg-custom-playlists { display: flex; flex-wrap: wrap; align-items: center; gap: var(--vbg-space-3) var(--vbg-space-6); }
-  .vbg-custom-playlists fieldset { display: flex; flex-wrap: wrap; gap: var(--vbg-space-2) var(--vbg-space-5); margin: 0; padding: 0; border: 0; min-width: 0; }
+  .vbg-custom-playlists fieldset { display: flex; flex-wrap: wrap; align-items: center; gap: var(--vbg-space-2) var(--vbg-space-5); margin: 0; padding: 0; border: 0; min-width: 0; }
   .vbg-custom-playlists label { display: inline-flex; align-items: center; gap: var(--vbg-space-2); color: var(--vbg-text-primary); font-size: var(--vbg-type-compact); line-height: var(--vbg-leading-compact); }
+  .vbg-custom-stats { color: var(--vbg-text-secondary); font-size: var(--vbg-type-compact); line-height: var(--vbg-leading-compact); font-variant-numeric: tabular-nums; margin-inline-start: var(--vbg-space-2); }
   .vbg-custom-panels { display: grid; gap: var(--vbg-space-8); }
   .vbg-custom-panels svg { display: block; width: 100%; height: 210px; touch-action: none; }
   .vbg-viz-track { fill: var(--pc-color); pointer-events: none; }
@@ -146,8 +147,7 @@
 
       <div class="vbg-stack" data-gap="tight">
         <div class="vbg-custom-playlists">
-          <fieldset id="tabs"><legend class="vbg-visually-hidden">Playlist shown in the charts and the track list</legend></fieldset>
-          <p class="vbg-meta" id="stats"></p>
+          <fieldset id="tabs"><legend class="vbg-visually-hidden">Playlist shown in the charts and the track list</legend><span class="vbg-custom-stats" id="stats"></span></fieldset>
         </div>
         <p class="vbg-caption">The line is the target. Drag the hollow handles to reshape it. Small dots are the tracks of the selected playlist at the time they play. Hover a chart to see the track.</p>
       </div>
@@ -452,7 +452,7 @@ function renderTabs() {
     const l = document.createElement('label');
     const r = document.createElement('input'); r.type = 'radio'; r.name = 'playlist'; r.value = i; r.checked = i === selected;
     r.onchange = () => { selected = i; renderAll(false); };
-    l.appendChild(r); l.appendChild(document.createTextNode(`Playlist ${i + 1}`)); box.appendChild(l);
+    l.appendChild(r); l.appendChild(document.createTextNode(`Playlist ${i + 1}`)); box.insertBefore(l, $('#stats'));
   });
 }
 
